@@ -1,0 +1,40 @@
+{{- if .Values.receipts.initializeOnInstall }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-initialize-receipts
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: initialize
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/cody-execution]
+          args:
+            - initialize-journal
+            - --installation
+            - {{ required "installation is required" .Values.installation | quote }}
+            - --receipt-log
+            - /receipts/admission.sqlite
+            - --executors-quiescent
+            - --fresh-only
+          volumeMounts:
+            - name: receipts
+              mountPath: /receipts
+      volumes:
+        - name: receipts
+          persistentVolumeClaim:
+            claimName: receipts-{{ .Release.Name }}-agent-0
+{{- end }}

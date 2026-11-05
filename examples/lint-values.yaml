@@ -1,0 +1,15 @@
+image: ghcr.io/codyfactory/chart-test@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+installation: installation-fixture
+gatewayURL: https://api.cody.so
+installationToken: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+scheduling:
+  idle_sandboxes: 1
+  active_turns: 1
+  admission_window: 1
+  default_source_active_limit: 1
+  default_lane_active_limit: 1
+receipts:
+  initializeOnInstall: true
+onboarding:
+  enabled: true
+  image: ghcr.io/codyfactory/chart-test-native@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb

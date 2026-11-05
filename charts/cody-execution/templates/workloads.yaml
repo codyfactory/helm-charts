@@ -1,0 +1,200 @@
+{{- $installation := required "installation is required" .Values.installation -}}
+{{- $gateway := required "gatewayURL is required" .Values.gatewayURL -}}
+{{- $installationToken := include "cody.installationSecret" . -}}
+{{- $token := include "cody.workerSecret" . -}}
+{{- $role := "agent" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  replicas: 1
+  serviceName: {{ $.Release.Name }}-agent
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  volumeClaimTemplates:
+    - metadata:
+        name: receipts
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with $.Values.receipts.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $.Values.receipts.size | quote }}
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-{{ $role }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-{{ $role }}
+    spec:
+      securityContext:
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 45
+      serviceAccountName: {{ $.Release.Name }}-{{ $role }}
+      containers:
+        - name: {{ $role }}
+          image: {{ $.Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/cody-execution]
+          args:
+            - serve
+            - --protected-secrets
+            - {{ printf "%s,%s,%s,%s" $installationToken $token $.Values.sandbox.assetPullSecret $.Values.sandbox.assetGitSecret | quote }}
+            - --namespace
+            - {{ $.Release.Namespace }}
+            - --worker-url
+            - http://{{ $.Release.Name }}-worker:8080
+            - --kube-api-qps
+            - {{ $.Values.kubernetes.qps | quote }}
+            - --kube-api-burst
+            - {{ $.Values.kubernetes.burst | quote }}
+            - --kube-api-timeout
+            - {{ $.Values.kubernetes.requestTimeout | quote }}
+            - --worker-token-file
+            - /worker-auth/token
+            - --scheduling-policy-file
+            - /scheduling/policy.json
+            - --sandbox-idle-timeout
+            - {{ $.Values.sandbox.idleTimeout | quote }}
+            - --sandbox-retention
+            - {{ $.Values.sandbox.retention | quote }}
+            - --receipt-log
+            - /receipts/admission.sqlite
+            - --installation
+            - {{ $installation | quote }}
+            - --gateway-url
+            - {{ $gateway | quote }}
+            - --installation-token-file
+            - /installation/token
+            {{- with $.Values.gatewayCASecret }}
+            - --server-ca
+            - /gateway-ca/ca.crt
+            {{- end }}
+            - --provisioning-timeout
+            - {{ required "provisioningTimeout is required" $.Values.provisioningTimeout | quote }}
+            - --asset-git-secret
+            - {{ $.Values.sandbox.assetGitSecret | quote }}
+            {{- with $.Values.sandbox.assetGitSecret }}
+            - --asset-git-config
+            - /run/cody/git/config.json
+            {{- end }}
+            {{- with $.Values.sandbox.assetPullSecret }}
+            - --asset-registry-config
+            - /run/cody/registry/config.json
+            {{- end }}
+            - --asset-pull-secret
+            - {{ $.Values.sandbox.assetPullSecret | quote }}
+            - --sandbox-workspace-size
+            - {{ $.Values.sandbox.workspaceSize | quote }}
+            - --sandbox-cpu-request
+            - {{ $.Values.sandbox.resources.requests.cpu | quote }}
+            - --sandbox-memory-request
+            - {{ $.Values.sandbox.resources.requests.memory | quote }}
+            - --sandbox-cpu-limit
+            - {{ $.Values.sandbox.resources.limits.cpu | quote }}
+            - --sandbox-memory-limit
+            - {{ $.Values.sandbox.resources.limits.memory | quote }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          volumeMounts:
+            {{- with $.Values.sandbox.assetPullSecret }}
+            - name: asset-registry
+              mountPath: /run/cody/registry
+              readOnly: true
+            {{- end }}
+            {{- with $.Values.sandbox.assetGitSecret }}
+            - name: asset-git
+              mountPath: /run/cody/git
+              readOnly: true
+            {{- end }}
+            - name: scheduling
+              mountPath: /scheduling
+              readOnly: true
+            - name: worker-auth
+              mountPath: /worker-auth
+              readOnly: true
+            - name: receipts
+              mountPath: /receipts
+            - name: installation
+              mountPath: /installation
+              readOnly: true
+            {{- with $.Values.gatewayCASecret }}
+            - name: gateway-ca
+              mountPath: /gateway-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- with $.Values.sandbox.assetPullSecret }}
+        - name: asset-registry
+          secret:
+            secretName: {{ . | quote }}
+            defaultMode: 0440
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+        {{- end }}
+        {{- with $.Values.sandbox.assetGitSecret }}
+        - name: asset-git
+          secret:
+            secretName: {{ . | quote }}
+            defaultMode: 0440
+            items:
+              - key: config.json
+                path: config.json
+        {{- end }}
+        - name: scheduling
+          configMap:
+            name: {{ $.Release.Name }}-scheduling
+        - name: worker-auth
+          secret:
+            secretName: {{ $token | quote }}
+        - name: installation
+          secret:
+            secretName: {{ $installationToken | quote }}
+        {{- with $.Values.gatewayCASecret }}
+        - name: gateway-ca
+          secret:
+            secretName: {{ . | quote }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-worker
+spec:
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ .Release.Name }}-agent
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-agent
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-agent
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -1,0 +1,4 @@
+artifacts/
+*values-private*
+cody-values.yaml
+cody-credential-values.yaml

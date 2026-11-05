@@ -1,1 +1,88 @@
-# helm-charts
+# Cody execution Helm charts
+
+This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
+
+The initial source PR is a **release candidate**. `index.yaml` intentionally contains no releases until a maintainer publishes real public image digests and the matching chart package. Do not treat synthetic example digests or core test packages as published artifacts.
+
+## Install
+
+Use an existing Linux amd64/arm64 Kubernetes cluster with persistent storage, Helm 4.3.1 and kubectl 1.37.2. In [Cody](https://app.cody.so), create an organization and installation, request inference approval and authorize/download that installation's private values. Keep the downloaded file private; it contains a long-lived installation key. Helm retains inline values in its release records.
+
+```sh
+helm repo add cody https://raw.githubusercontent.com/codyfactory/helm-charts/main
+helm repo update
+chmod 600 ./cody-values.yaml
+
+# Replace these with the exact portal registration and chosen cluster.
+export CODY_KUBECONFIG=/ABSOLUTE/PATH/TO/kubeconfig
+export CODY_KUBE_CONTEXT=YOUR_CONTEXT
+export CODY_NAMESPACE=YOUR_REGISTERED_NAMESPACE
+export CODY_HELM_RELEASE=YOUR_REGISTERED_RELEASE
+export CODY_CHART_VERSION=YOUR_PORTAL_CHART_VERSION
+
+helm install "$CODY_HELM_RELEASE" cody/cody-execution \
+  --version "$CODY_CHART_VERSION" \
+  --kubeconfig "$CODY_KUBECONFIG" --kube-context "$CODY_KUBE_CONTEXT" \
+  --namespace "$CODY_NAMESPACE" --create-namespace \
+  --values ./cody-values.yaml --timeout 5m
+
+kubectl --kubeconfig "$CODY_KUBECONFIG" --context "$CODY_KUBE_CONTEXT" \
+  --namespace "$CODY_NAMESPACE" rollout status \
+  "statefulset/${CODY_HELM_RELEASE}-agent" --timeout=300s
+```
+
+**Fresh install omits `--wait` and `--atomic`.** Receipt initialization is a post-install hook; waiting for the uninitialized controller first would block that hook. The hook itself waits for completion. Return to the portal for actual readiness and the native first test. Inference requires separate Cody operator approval.
+
+The namespace must have no retained PVCs when fresh initialization is requested. Helm needs permission to list PVCs and read Secrets; failed inventory is a refusal. A failed release is not a fresh namespace. Never delete/reinitialize receipt or session volumes to retry. Inspect Helm/Kubernetes status and diagnose explicitly.
+
+## Credentials and ownership
+
+- `installationToken` creates a Helm-owned `<release>-installation-token` Secret. Use **either** that inline value **or** `installationTokenSecret`, never both.
+- An empty `workerTokenSecret` generates a local worker/Attach key once in `<release>-worker-auth`. Upgrades use Helm's live `lookup` and require that exact release-owned Secret and valid token. A missing or foreign Secret is an error, never a key-rotation fallback.
+- For customer secret managers/GitOps, use `installationTokenSecret` and `workerTokenSecret`; see [existing-Secret values](examples/existing-secrets.yaml). Do not put plaintext in Git. Both Secrets need a `token` key. External worker keys must be stable and shared by the controller and worker.
+- Offline `helm template` cannot reuse generated live worker bytes. GitOps/offline rendering therefore requires external Secrets and already initialized storage (`receipts.initializeOnInstall: false`). Initial storage administration remains explicit.
+- `onboarding.enabled` optionally creates Helm-owned `cody-onboarding-codex` Agent and `cody-onboarding` Workflow. They bind only `operator/onboarding/<installation>`. Normal Helm upgrades apply the customer's chosen values to them. Do not independently adopt same-named resources.
+- Chart installation does not call a model, provision a cluster or grant inference approval.
+
+See [UPGRADE.md](UPGRADE.md) for rotation, CRDs and preservation rules.
+
+## Local verification
+
+```sh
+mise install
+mise exec -- helm lint --strict charts/cody-execution --values examples/lint-values.yaml
+mise exec -- bash tests/templates.sh
+```
+
+The example digests and token are synthetic lint fixtures. Real controller/native/storage acceptance runs in the core Cody repo against the exact checksum-verified package exported from this source. Source editing happens here; core stores only a test package, not an editable second chart.
+
+## Manual publication
+
+No Actions or Pages deployment is required. Authenticate Git through your usual GitHub credentials. Never overwrite any published version, tag or package. First build/push public execution/general/SRE images from the same clean core commit and verify anonymous amd64/arm64 pulls, following the core [rollout guide](https://github.com/codyfactory/cody/blob/codex/saas-onboarding-v2-spec/deploy/fly/SAAS-HELM.md).
+
+Set a **new unused version** in `charts/cody-execution/Chart.yaml`. Pin `values.yaml`'s `image` and `onboarding.image` to the real public execution and general-runtime digests. Validate with actual production values (never commit private values). Then:
+
+```sh
+export CODY_CHART_VERSION=0.5.0
+export CODY_CORE_COMMIT=EXACT_40_CHARACTER_CORE_COMMIT
+export CODY_SRE_IMAGE=ghcr.io/codyfactory/cody-runtime-sre@sha256:REAL_DIGEST
+
+test ! -e "cody-execution-${CODY_CHART_VERSION}.tgz"
+git diff --check
+mise exec -- helm lint --strict charts/cody-execution --values examples/lint-values.yaml
+mise exec -- bash tests/templates.sh
+mise exec -- helm package charts/cody-execution --destination .
+mise exec -- helm repo index . \
+  --url https://raw.githubusercontent.com/codyfactory/helm-charts/main \
+  --merge index.yaml
+shasum -a 256 "cody-execution-${CODY_CHART_VERSION}.tgz"
+
+git add charts/cody-execution index.yaml "cody-execution-${CODY_CHART_VERSION}.tgz"
+git commit -m "Publish Cody execution chart ${CODY_CHART_VERSION}"
+git push origin HEAD
+# Merge that publication PR before tagging its exact main commit.
+```
+
+After merge, checkout/pull main and create the immutable `cody-execution-<version>` tag on the publication commit. Preserve all old packages/index entries. Verify anonymous acquisition with an empty Helm repository config before adding the supported release descriptor to core. The descriptor records package URL, byte size, SHA256, core commit, image digests, protocol, chart/runtime versions and explicitly tested transitions. Do not infer runtime version from chart version. Do not activate a descriptor for this empty candidate index.
+
+Only chart sources, generic CRDs, packages/index and public docs belong here. No credentials, kubeconfigs, private values, company tooling or application source.

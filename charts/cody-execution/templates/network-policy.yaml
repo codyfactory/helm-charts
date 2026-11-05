@@ -1,0 +1,58 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- range .Values.networkPolicy.toolDomains }}
+{{- if or (contains "openrouter" (lower .)) (contains "openai" (lower .)) (contains "anthropic" (lower .)) (contains "*" .) }}
+{{- fail "networkPolicy.toolDomains must not permit provider domains or wildcards" }}
+{{- end }}
+{{- end }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-sandbox-egress
+spec:
+  endpointSelector:
+    matchExpressions:
+      - key: cody.so/sandbox
+        operator: Exists
+  enableDefaultDeny:
+    egress: true
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchName: api.cody.so
+              - matchName: {{ printf "%s-worker.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- range .Values.networkPolicy.toolDomains }}
+              - matchName: {{ . | quote }}
+              {{- end }}
+    - toFQDNs:
+        - matchName: api.cody.so
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+          serverNames: [api.cody.so]
+    {{- range .Values.networkPolicy.toolDomains }}
+    - toFQDNs:
+        - matchName: {{ . | quote }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+          serverNames: [{{ . | quote }}]
+    {{- end }}
+    - toEndpoints:
+        - matchLabels:
+            app: {{ .Release.Name }}-agent
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+{{- end }}

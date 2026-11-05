@@ -1,0 +1,23 @@
+{{- if .Values.onboarding.enabled }}
+apiVersion: execution.cody.so/v1alpha1
+kind: Agent
+metadata:
+  name: cody-onboarding-codex
+spec:
+  image: {{ required "onboarding.image is required" .Values.onboarding.image | quote }}
+  codex: {}
+  inference:
+    model: {{ .Values.onboarding.model | quote }}
+    endpoint: {{ printf "%s/inference" (.Values.gatewayURL | trimSuffix "/") | quote }}
+---
+apiVersion: execution.cody.so/v1alpha1
+kind: Workflow
+metadata:
+  name: cody-onboarding
+spec:
+  agent: cody-onboarding-codex
+  source:
+    provider: operator
+    connectorID: onboarding
+    resourceID: {{ .Values.installation | quote }}
+{{- end }}
