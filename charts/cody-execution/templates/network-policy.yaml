@@ -27,7 +27,7 @@ spec:
           rules:
             dns:
               - matchName: api.cody.so
-              - matchName: {{ printf "%s-worker.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              - matchName: {{ printf "%s-execution-plane.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- range .Values.networkPolicy.toolDomains }}
               - matchName: {{ . | quote }}
               {{- end }}
@@ -49,7 +49,7 @@ spec:
     {{- end }}
     - toEndpoints:
         - matchLabels:
-            app: {{ .Release.Name }}-agent
+            app: {{ .Release.Name }}-execution-plane
             k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
       toPorts:
         - ports:

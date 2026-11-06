@@ -1,8 +1,8 @@
 {{- $installation := required "installation is required" .Values.installation -}}
 {{- $gateway := required "gatewayURL is required" .Values.gatewayURL -}}
 {{- $installationToken := include "cody.installationSecret" . -}}
-{{- $token := include "cody.workerSecret" . -}}
-{{- $role := "agent" }}
+{{- $token := include "cody.runtimeSecret" . -}}
+{{- $role := "execution-plane" }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -15,7 +15,7 @@ metadata:
   name: {{ $.Release.Name }}-{{ $role }}
 spec:
   replicas: 1
-  serviceName: {{ $.Release.Name }}-agent
+  serviceName: {{ $.Release.Name }}-execution-plane-headless
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
@@ -50,25 +50,27 @@ spec:
           args:
             - serve
             - --protected-secrets
-            - {{ printf "%s,%s,%s,%s" $installationToken $token $.Values.sandbox.assetPullSecret $.Values.sandbox.assetGitSecret | quote }}
+            - {{ printf "%s,%s,%s" $installationToken $token $.Values.gatewayCASecret | quote }}
             - --namespace
             - {{ $.Release.Namespace }}
-            - --worker-url
-            - http://{{ $.Release.Name }}-worker:8080
+            - --execution-plane-url
+            - http://{{ $.Release.Name }}-execution-plane:8080
             - --kube-api-qps
             - {{ $.Values.kubernetes.qps | quote }}
             - --kube-api-burst
             - {{ $.Values.kubernetes.burst | quote }}
             - --kube-api-timeout
             - {{ $.Values.kubernetes.requestTimeout | quote }}
-            - --worker-token-file
-            - /worker-auth/token
+            - --runtime-token-file
+            - /runtime-auth/token
             - --scheduling-policy-file
             - /scheduling/policy.json
             - --sandbox-idle-timeout
             - {{ $.Values.sandbox.idleTimeout | quote }}
             - --sandbox-retention
             - {{ $.Values.sandbox.retention | quote }}
+            - --asset-validation-directory
+            - /var/lib/cody/asset-validation
             - --receipt-log
             - /receipts/admission.sqlite
             - --installation
@@ -83,18 +85,14 @@ spec:
             {{- end }}
             - --provisioning-timeout
             - {{ required "provisioningTimeout is required" $.Values.provisioningTimeout | quote }}
-            - --asset-git-secret
-            - {{ $.Values.sandbox.assetGitSecret | quote }}
-            {{- with $.Values.sandbox.assetGitSecret }}
-            - --asset-git-config
-            - /run/cody/git/config.json
+            {{- if $.Values.assetAccess.azure.clientID }}
+            - --asset-access-config
+            - /asset-access/config.json
             {{- end }}
-            {{- with $.Values.sandbox.assetPullSecret }}
-            - --asset-registry-config
-            - /run/cody/registry/config.json
+            {{- with $.Values.sandbox.storageClass }}
+            - --sandbox-storage-class
+            - {{ . | quote }}
             {{- end }}
-            - --asset-pull-secret
-            - {{ $.Values.sandbox.assetPullSecret | quote }}
             - --sandbox-workspace-size
             - {{ $.Values.sandbox.workspaceSize | quote }}
             - --sandbox-cpu-request
@@ -114,22 +112,24 @@ spec:
               path: /healthz
               port: 8080
           volumeMounts:
-            {{- with $.Values.sandbox.assetPullSecret }}
-            - name: asset-registry
-              mountPath: /run/cody/registry
+            {{- if $.Values.assetAccess.azure.clientID }}
+            - name: asset-access
+              mountPath: /asset-access
+              readOnly: true
+            {{- if $.Values.assetAccess.azure.clientID }}
+            - name: asset-azure-token
+              mountPath: /run/cody/azure
               readOnly: true
             {{- end }}
-            {{- with $.Values.sandbox.assetGitSecret }}
-            - name: asset-git
-              mountPath: /run/cody/git
-              readOnly: true
             {{- end }}
             - name: scheduling
               mountPath: /scheduling
               readOnly: true
-            - name: worker-auth
-              mountPath: /worker-auth
+            - name: runtime-auth
+              mountPath: /runtime-auth
               readOnly: true
+            - name: asset-validation
+              mountPath: /var/lib/cody/asset-validation
             - name: receipts
               mountPath: /receipts
             - name: installation
@@ -141,28 +141,28 @@ spec:
               readOnly: true
             {{- end }}
       volumes:
-        {{- with $.Values.sandbox.assetPullSecret }}
-        - name: asset-registry
-          secret:
-            secretName: {{ . | quote }}
+        - name: asset-validation
+          emptyDir:
+            sizeLimit: {{ $.Values.assetValidation.size | quote }}
+        {{- if $.Values.assetAccess.azure.clientID }}
+        - name: asset-access
+          configMap:
+            name: {{ $.Release.Name }}-asset-access
+        {{- if $.Values.assetAccess.azure.clientID }}
+        - name: asset-azure-token
+          projected:
             defaultMode: 0440
-            items:
-              - key: .dockerconfigjson
-                path: config.json
+            sources:
+              - serviceAccountToken:
+                  audience: api://AzureADTokenExchange
+                  expirationSeconds: 3600
+                  path: token
         {{- end }}
-        {{- with $.Values.sandbox.assetGitSecret }}
-        - name: asset-git
-          secret:
-            secretName: {{ . | quote }}
-            defaultMode: 0440
-            items:
-              - key: config.json
-                path: config.json
         {{- end }}
         - name: scheduling
           configMap:
             name: {{ $.Release.Name }}-scheduling
-        - name: worker-auth
+        - name: runtime-auth
           secret:
             secretName: {{ $token | quote }}
         - name: installation
@@ -177,11 +177,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-worker
+  name: {{ .Release.Name }}-execution-plane
 spec:
   publishNotReadyAddresses: true
   selector:
-    app: {{ .Release.Name }}-agent
+    app: {{ .Release.Name }}-execution-plane
   ports:
     - port: 8080
       targetPort: 8080
@@ -190,11 +190,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-agent
+  name: {{ .Release.Name }}-execution-plane-headless
 spec:
   clusterIP: None
   selector:
-    app: {{ .Release.Name }}-agent
+    app: {{ .Release.Name }}-execution-plane
   ports:
     - port: 8080
       targetPort: 8080

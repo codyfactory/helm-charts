@@ -28,12 +28,12 @@ spec:
                   message: Specify exactly one Workflow source
                 - rule: "!has(self.githubWorkflow) || (has(self.source) && self.source.provider == 'github')"
                   message: A GitHub workflow requires a GitHub source
-                - rule: "!has(self.schedule) || has(self.session)"
-                  message: A scheduled Workflow requires explicit session continuity
-                - rule: "!has(self.session) || has(self.schedule)"
-                  message: Explicit session continuity requires a schedule
+                - rule: "!has(self.schedule) || has(self.sandbox)"
+                  message: A scheduled Workflow requires explicit sandbox continuity
+                - rule: "!has(self.sandbox) || has(self.schedule)"
+                  message: Explicit sandbox continuity requires a schedule
               properties:
-                session:
+                sandbox:
                   type: object
                   required: [continuity]
                   properties:
@@ -296,7 +296,7 @@ spec:
                           type: string
                         reason:
                           type: string
-                        sessionResetReason:
+                        sandboxResetReason:
                           type: string
                 resolved:
                   type: boolean

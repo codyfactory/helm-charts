@@ -10,10 +10,10 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "cody.workerSecret" -}}
-{{- if .Values.workerTokenSecret -}}
-{{- .Values.workerTokenSecret -}}
+{{- define "cody.runtimeSecret" -}}
+{{- if .Values.runtimeTokenSecret -}}
+{{- .Values.runtimeTokenSecret -}}
 {{- else -}}
-{{- printf "%s-worker-auth" .Release.Name -}}
+{{- printf "%s-runtime-auth" .Release.Name -}}
 {{- end -}}
 {{- end -}}

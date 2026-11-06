@@ -1,0 +1,12 @@
+{{- $azure := .Values.assetAccess.azure }}
+{{- if ne (empty $azure.tenantID) (empty $azure.clientID) }}
+{{- fail "assetAccess.azure requires both tenantID and clientID" }}
+{{- end }}
+{{- if $azure.clientID }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-asset-access
+data:
+  config.json: {{ dict "azure" (dict "tenantID" $azure.tenantID "clientID" $azure.clientID "tokenFile" "/run/cody/azure/token") | toJson | quote }}
+{{- end }}

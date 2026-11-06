@@ -2,4 +2,4 @@ apiVersion: v2
 name: cody-execution
 version: 0.5.0
 appVersion: 0.5.0
-description: Cody execution agent and Kubernetes sandbox worker
+description: Cody execution plane and persistent Sandboxes

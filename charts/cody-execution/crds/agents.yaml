@@ -13,11 +13,33 @@ spec:
     - name: v1alpha1
       served: true
       storage: true
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
           type: object
           required: [spec]
           properties:
+            status:
+              type: object
+              properties:
+                assets:
+                  type: object
+                  properties:
+                    observedGeneration: {type: integer, format: int64}
+                    observedUID: {type: string}
+                    fingerprint: {type: string}
+                    ready: {type: boolean}
+                    lastSuccess: {type: string, format: date-time}
+                    lastError: {type: string, maxLength: 128}
+                    versions:
+                      type: array
+                      maxItems: 32
+                      items:
+                        type: object
+                        properties:
+                          source: {type: string}
+                          version: {type: string}
             spec:
               type: object
               required: [image]
@@ -80,13 +102,63 @@ spec:
                     type: object
                     nullable: true
                     x-kubernetes-preserve-unknown-fields: true
-                    maxProperties: 2
+                    maxProperties: 3
                     oneOf:
                       - required: [bundle, names]
-                        maxProperties: 2
+                        maxProperties: 3
                       - required: [source]
-                        maxProperties: 1
+                        maxProperties: 2
                     properties:
+                      auth:
+                        type: object
+                        default: {public: {}}
+                        nullable: true
+                        x-kubernetes-preserve-unknown-fields: true
+                        minProperties: 1
+                        maxProperties: 1
+                        properties:
+                          public:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                            maxProperties: 0
+                          secretRef:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                            required: [name]
+                            maxProperties: 1
+                            properties:
+                              name:
+                                type: string
+                                nullable: true
+                                minLength: 1
+                                maxLength: 253
+                                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+                            x-kubernetes-validations:
+                              - rule: "dyn(self.name) != null"
+                                message: Secret name must not be null
+                          githubApp:
+                            type: object
+                            nullable: true
+                            maxProperties: 1
+                            additionalProperties:
+                              type: string
+                              nullable: true
+                              minLength: 1
+                              maxLength: 253
+                              pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+                            x-kubernetes-validations:
+                              - rule: "dyn(self) != null && self.all(k, k == 'connectorRef' && dyn(self[k]) != null)"
+                                message: GitHub App accepts only a non-null connectorRef; omit it for automatic selection
+                          acrWorkloadIdentity:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                            maxProperties: 0
+                        x-kubernetes-validations:
+                          - rule: "dyn(self) != null && ((has(self.public) && dyn(self.public) != null) || (has(self.secretRef) && dyn(self.secretRef) != null) || (has(self.githubApp) && dyn(self.githubApp) != null) || (has(self.acrWorkloadIdentity) && dyn(self.acrWorkloadIdentity) != null))"
+                            message: Select exactly one non-null authentication block
                       bundle:
                         type: string
                         nullable: true
@@ -160,10 +232,12 @@ spec:
                           - rule: "dyn(self.git) != null"
                             message: Git source must not be null
                   x-kubernetes-validations:
-                    - rule: "dyn(self) != null && self.all(s, dyn(s) != null && (has(s.source) ? dyn(s.source) != null : has(s.bundle) && has(s.names) && dyn(s.bundle) != null && dyn(s.names) != null && s.names.all(n, dyn(n) != null)))"
+                    - rule: "dyn(self) != null && self.all(s, dyn(s) != null && dyn(s.auth) != null && (has(s.source) ? dyn(s.source) != null : has(s.bundle) && has(s.names) && dyn(s.bundle) != null && dyn(s.names) != null && s.names.all(n, dyn(n) != null)))"
                       message: Select either a Git source or an OCI bundle with non-null names
                     - rule: "self.all(a, !has(a.names) || a.names.all(n, a.names.filter(x, x == n).size() == 1 && self.filter(b, has(b.names) && n in b.names).size() == 1))"
                       message: Selected OCI skill names must be unique across bundles
+                    - rule: "self.all(s, !has(s.auth) ? (!has(s.source) || s.source.git.url.startsWith('https://')) : (!has(s.auth.public) || !has(s.source) || s.source.git.url.startsWith('https://')) && (!has(s.auth.githubApp) || has(s.source) && s.source.git.url.matches('^https://(?i:github[.]com)/')) && (!has(s.auth.acrWorkloadIdentity) || has(s.bundle) && s.bundle.matches('^[a-z0-9.-]+[.]azurecr[.]io/')))"
+                      message: Authentication must match the selected source provider
                     - rule: "self.map(s, has(s.source) ? s.source.git.paths.size() : s.names.size()).sum() <= 64"
                       message: Select at most 64 skills
                 referenceInputs:
@@ -174,7 +248,59 @@ spec:
                     type: object
                     nullable: true
                     required: [name, bundle]
+                    maxProperties: 3
+                    x-kubernetes-preserve-unknown-fields: true
                     properties:
+                      auth:
+                        type: object
+                        default: {public: {}}
+                        nullable: true
+                        x-kubernetes-preserve-unknown-fields: true
+                        minProperties: 1
+                        maxProperties: 1
+                        properties:
+                          public:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                            maxProperties: 0
+                          secretRef:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                            required: [name]
+                            maxProperties: 1
+                            properties:
+                              name:
+                                type: string
+                                nullable: true
+                                minLength: 1
+                                maxLength: 253
+                                pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+                            x-kubernetes-validations:
+                              - rule: "dyn(self.name) != null"
+                                message: Secret name must not be null
+                          githubApp:
+                            type: object
+                            nullable: true
+                            maxProperties: 1
+                            additionalProperties:
+                              type: string
+                              nullable: true
+                              minLength: 1
+                              maxLength: 253
+                              pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'
+                            x-kubernetes-validations:
+                              - rule: "dyn(self) != null && self.all(k, k == 'connectorRef' && dyn(self[k]) != null)"
+                                message: GitHub App accepts only a non-null connectorRef; omit it for automatic selection
+                          acrWorkloadIdentity:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                            maxProperties: 0
+                        x-kubernetes-validations:
+                          - rule: "dyn(self) != null && ((has(self.public) && dyn(self.public) != null) || (has(self.secretRef) && dyn(self.secretRef) != null) || (has(self.githubApp) && dyn(self.githubApp) != null) || (has(self.acrWorkloadIdentity) && dyn(self.acrWorkloadIdentity) != null))"
+                            message: Select exactly one non-null authentication block
                       name:
                         type: string
                         nullable: true
@@ -186,8 +312,10 @@ spec:
                         maxLength: 512
                         pattern: '^[a-z0-9]+([.-][a-z0-9]+)*(:[0-9]+)?(/[a-z0-9]+(([._]|__|-+)[a-z0-9]+)*)+(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?@sha256:[a-f0-9]{64})$'
                   x-kubernetes-validations:
-                    - rule: "dyn(self) != null && self.all(r, dyn(r) != null && dyn(r.name) != null && dyn(r.bundle) != null)"
+                    - rule: "dyn(self) != null && self.all(r, dyn(r) != null && dyn(r.auth) != null && dyn(r.name) != null && dyn(r.bundle) != null)"
                       message: referenceInputs must contain non-null names and bundles
+                    - rule: "self.all(r, !has(r.auth) || !has(r.auth.githubApp) && (!has(r.auth.acrWorkloadIdentity) || r.bundle.matches('^[a-z0-9.-]+[.]azurecr[.]io/')))"
+                      message: Reference authentication must match the OCI registry
                     - rule: "self.all(a, self.filter(b, a.name == b.name).size() == 1)"
                       message: Reference input names must be unique
                 agentsMD:

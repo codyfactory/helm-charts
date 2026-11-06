@@ -36,5 +36,5 @@ spec:
       volumes:
         - name: receipts
           persistentVolumeClaim:
-            claimName: receipts-{{ .Release.Name }}-agent-0
+            claimName: receipts-{{ .Release.Name }}-execution-plane-0
 {{- end }}

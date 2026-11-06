@@ -1,11 +1,17 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .Release.Name }}-agent
+  name: {{ .Release.Name }}-execution-plane
 rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get]
   - apiGroups: [execution.cody.so]
     resources: [agents, workflows]
     verbs: [get, list, watch]
+  - apiGroups: [execution.cody.so]
+    resources: [agents/status]
+    verbs: [update]
   - apiGroups: [execution.cody.so]
     resources: [workflows/status]
     verbs: [patch]
@@ -19,7 +25,7 @@ rules:
     resources: [statefulsets]
     verbs: [get, list, watch, create, patch, delete]
 ---
-{{- range $role := list "agent" }}
+{{- range $role := list "execution-plane" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

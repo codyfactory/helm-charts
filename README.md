@@ -28,19 +28,19 @@ helm install "$CODY_HELM_RELEASE" cody/cody-execution \
 
 kubectl --kubeconfig "$CODY_KUBECONFIG" --context "$CODY_KUBE_CONTEXT" \
   --namespace "$CODY_NAMESPACE" rollout status \
-  "statefulset/${CODY_HELM_RELEASE}-agent" --timeout=300s
+  "statefulset/${CODY_HELM_RELEASE}-execution-plane" --timeout=300s
 ```
 
 **Fresh install omits `--wait` and `--atomic`.** Receipt initialization is a post-install hook; waiting for the uninitialized controller first would block that hook. The hook itself waits for completion. Return to the portal for actual readiness and the native first test. Inference requires separate Cody operator approval.
 
-The namespace must have no retained PVCs when fresh initialization is requested. Helm needs permission to list PVCs and read Secrets; failed inventory is a refusal. A failed release is not a fresh namespace. Never delete/reinitialize receipt or session volumes to retry. Inspect Helm/Kubernetes status and diagnose explicitly.
+The namespace must have no retained PVCs when fresh initialization is requested. Helm needs permission to list PVCs and read Secrets; failed inventory is a refusal. A failed release is not a fresh namespace. Never delete/reinitialize receipt or Sandbox volumes to retry. Inspect Helm/Kubernetes status and diagnose explicitly.
 
 ## Credentials and ownership
 
 - `installationToken` creates a Helm-owned `<release>-installation-token` Secret. Use **either** that inline value **or** `installationTokenSecret`, never both.
-- An empty `workerTokenSecret` generates a local worker/Attach key once in `<release>-worker-auth`. Upgrades use Helm's live `lookup` and require that exact release-owned Secret and valid token. A missing or foreign Secret is an error, never a key-rotation fallback.
-- For customer secret managers/GitOps, use `installationTokenSecret` and `workerTokenSecret`; see [existing-Secret values](examples/existing-secrets.yaml). Do not put plaintext in Git. Both Secrets need a `token` key. External worker keys must be stable and shared by the controller and worker.
-- Offline `helm template` cannot reuse generated live worker bytes. GitOps/offline rendering therefore requires external Secrets and already initialized storage (`receipts.initializeOnInstall: false`). Initial storage administration remains explicit.
+- An empty `runtimeTokenSecret` generates a local runtime/Attach key once in `<release>-runtime-auth`. Upgrades use Helm's live `lookup` and require that exact release-owned Secret and valid token. A missing or foreign Secret is an error, never a key-rotation fallback.
+- For customer secret managers/GitOps, use `installationTokenSecret` and `runtimeTokenSecret`; see [existing-Secret values](examples/existing-secrets.yaml). Do not put plaintext in Git. Both Secrets need a `token` key. External runtime keys must be stable and shared by the execution plane and runtime.
+- Offline `helm template` cannot reuse generated live runtime-token bytes. GitOps/offline rendering therefore requires external Secrets and already initialized storage (`receipts.initializeOnInstall: false`). Initial storage administration remains explicit.
 - `onboarding.enabled` optionally creates Helm-owned `cody-onboarding-codex` Agent and `cody-onboarding` Workflow. They bind only `operator/onboarding/<installation>`. Normal Helm upgrades apply the customer's chosen values to them. Do not independently adopt same-named resources.
 - Chart installation does not call a model, provision a cluster or grant inference approval.
 

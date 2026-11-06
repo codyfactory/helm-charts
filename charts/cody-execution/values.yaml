@@ -4,7 +4,7 @@ gatewayURL: ""
 installationToken: ""
 installationTokenSecret: ""
 gatewayCASecret: ""
-workerTokenSecret: ""
+runtimeTokenSecret: ""
 provisioningTimeout: 30m
 kubernetes:
   qps: 20
@@ -15,8 +15,7 @@ receipts:
   storageClass: ""
   initializeOnInstall: false
 sandbox:
-  assetPullSecret: ""
-  assetGitSecret: ""
+  storageClass: ""
   workspaceSize: 1Gi
   idleTimeout: 15m
   retention: 720h
@@ -36,3 +35,10 @@ onboarding:
   enabled: false
   image: ""
   model: cody/codex-v1
+assetAccess:
+  azure:
+    tenantID: ""
+    clientID: ""
+
+assetValidation:
+  size: 2Gi
