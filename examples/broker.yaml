@@ -3,8 +3,6 @@ accessBroker:
   tlsSecret: broker-server-tls
   feedTLSSecret: broker-feed-tls
   caSecret: broker-ca
-  clientCASecret: broker-client-ca
-  clientSigningSecret: broker-client-signer
   networkPolicy:
     provider: external
     externalEnforcementConfigured: true

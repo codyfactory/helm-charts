@@ -57,7 +57,7 @@ fi
 azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true --set accessBroker.identities[0].identity.AzureClientID=client)"
 rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
 rg -q 'resources: \[serviceaccounts/token\]' <<<"$azure_broker"
-for invalid in 'accessBroker.tlsSecret=' 'accessBroker.clientCASecret=' 'accessBroker.clientSigningSecret=' 'accessBroker.clientSigningSecret=broker-client-ca' 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true'; do
+for invalid in 'accessBroker.tlsSecret=' 'accessBroker.caSecret=' 'accessBroker.feedTLSSecret=' 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true'; do
   if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set "$invalid" >/dev/null 2>&1; then
     echo "Invalid broker configuration unexpectedly rendered: $invalid" >&2
     exit 1
@@ -71,6 +71,27 @@ if rg -q 'matchName: management.azure.com|matchName: api.loganalytics.io' <<<"$c
   exit 1
 fi
 
-rg -q -- '--client-ca=/etc/cody/client-ca/ca.crt' <<<"$broker"
-rg -q -- '--broker-client-ca-key=/broker-client-signer/tls.key' <<<"$broker"
-rg -q 'verbs: \[get, create, update, delete\]' <<<"$broker"
+
+rg -q -- '--broker-sandbox-service-account=fixture-sandbox' <<<"$broker"
+rg -q -- '--sandbox-service-account=fixture-sandbox' <<<"$broker"
+rg -q '^automountServiceAccountToken: false$' <<<"$broker"
+if rg -q 'client-ca|client-signer|broker-client-ca|verbs: \[get, create, update, delete\]' <<<"$broker"; then
+  echo 'Retired client-certificate provisioning unexpectedly rendered' >&2
+  exit 1
+fi
+for mode in broker azure_broker; do
+  rendered="${!mode}"
+  binding="$(sed -n '/^kind: ClusterRoleBinding$/,/^---$/p' <<<"$rendered")"
+  rg -q 'name: fixture-execution-plane' <<<"$binding"
+  rg -q 'name: fixture-broker-kubernetes' <<<"$binding"
+  if rg -q 'name: fixture-sandbox' <<<"$binding"; then
+    echo 'Sandbox account unexpectedly receives TokenReview permissions' >&2
+    exit 1
+  fi
+  if [[ "$mode" == azure_broker ]]; then
+    rg -q 'name: fixture-broker-azure' <<<"$binding"
+  elif rg -q 'name: fixture-broker-azure' <<<"$binding"; then
+    echo 'Disabled Azure broker unexpectedly receives TokenReview permissions' >&2
+    exit 1
+  fi
+done

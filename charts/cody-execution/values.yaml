@@ -48,8 +48,6 @@ accessBroker:
   tlsSecret: ""
   feedTLSSecret: ""
   caSecret: ""
-  clientCASecret: ""
-  clientSigningSecret: ""
   audience: cody-access-broker
   identityFreshness: 5s
   identities: []
