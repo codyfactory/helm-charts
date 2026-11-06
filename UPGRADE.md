@@ -1,6 +1,6 @@
 # Upgrades and credential rotation
 
-This procedure applies only to compatible current-protocol installations. For an earlier execution version, follow the breaking cutover section below before attempting an upgrade or rotation.
+This procedure applies only to compatible current-protocol installations. For an earlier execution version, follow the greenfield baseline section below before attempting an upgrade or rotation.
 
 Preserve every receipt/Sandbox PVC and the installation and runtime-token identities. Settle active work and back up storage first. Read the exact supported transition in the portal/core release metadata. Selecting a target does not apply it.
 
@@ -48,31 +48,23 @@ Execution reads its installation token at startup, so the explicit restart above
 
 For existing-Secret mode, update only the customer-owned installation Secret using your secret manager/file input. Then use the same explicit rollout restart/status sequence and verify fresh connectivity before revoking the predecessor. Do not switch to inline mode or rotate the runtime/Attach Secret. Reinstalling with lost Helm metadata, retained claims or a missing runtime Secret requires explicit diagnosis, not adoption or fresh initialization. Helm uninstall leaves StatefulSet-generated PVCs, but do not rely on uninstall as a migration procedure.
 
-## Breaking Sandbox/execution-plane cutover
+## Greenfield Sandbox baseline
 
-These install/rotation instructions target installation protocol 3, runtime image
-protocol 2 and receipt-journal format 5. Earlier `-agent`/`-worker` resources,
-`workerTokenSecret` values, callback services and receipt layouts are incompatible.
-This is not a rolling upgrade or a credential rotation.
+The current baseline uses installation delivery protocol 3 and runtime-image
+protocol 2. Core defines fresh Sandbox PostgreSQL schemas directly through 038;
+the paired onboarding index is migration 039. There is no terminology-conversion
+migration or numbered receipt-format migration. Fresh-only initialization checks
+the current journal structure and initialization/installation markers.
 
-Stop incoming work, settle or explicitly abandon outstanding turns, and stop the
-old execution plane and runtime Pods. Archive the database and receipt/Sandbox
-PVCs before changing either plane. The control-plane migration 039 refuses old
-serialized dispatch receipts/operation results; an installation with that history
-needs an explicitly provisioned fresh database. Never delete individual receipt
-rows or change a version marker to bypass that refusal. The onboarding follow-up
-adds index migration 040; it does not convert incompatible execution history.
+Do not run these instructions against earlier `-agent`/`-worker` resources,
+`workerTokenSecret` values or incompatible receipt layouts. Archive old database
+and receipt/native storage before replacing an earlier development installation.
+Provision an explicitly chosen fresh database and fresh receipt storage for the
+current greenfield baseline; do not relabel schema markers, delete individual
+receipt rows, or assume native-state migration. No automatic reset/adoption or
+compatibility wrapper is provided.
 
-Provision fresh receipt storage and matching protocol-2 runtime images. Update
-Workflow Sandbox fields, CRDs, Secrets, resource references and network policies
-together. Old native state/PVC layouts are not automatically migrated. Keep the
-old archives until their deletion is explicitly authorized. Register the current
-installation, restore reviewed configuration/grants, and verify a new Sandbox and
-two consecutive turns before enabling incoming work.
-
-Within this new protocol, ordinary credential rotation preserves the generated
-runtime token and every receipt/Sandbox PVC. Use the installed compatible chart
-version, disable initialization, restart `<release>-execution-plane`, confirm a
-fresh authenticated report and successful test, then revoke the predecessor.
-Rollback across the cutover requires matching old binaries, database backup and
-receipt storage; old binaries cannot serve the new database or journal.
+Within a compatible current installation, ordinary credential rotation preserves
+the generated runtime token and every receipt/Sandbox PVC. Use the installed
+chart version, disable initialization, restart `<release>-execution-plane`,
+confirm fresh authentication and a successful test, then revoke the predecessor.
