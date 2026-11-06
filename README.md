@@ -46,6 +46,36 @@ The namespace must have no retained PVCs when fresh initialization is requested.
 
 See [UPGRADE.md](UPGRADE.md) for rotation, CRDs and preservation rules.
 
+## Agent assets and controller access
+
+Authentication is selected on each Agent skill/reference entry. Omit `auth` for
+anonymous access, or select exactly one of `public: {}`, `secretRef: {name: ...}`,
+`githubApp: {}` (or an explicit `connectorRef`), and `acrWorkloadIdentity: {}`.
+GitHub App access requires the hosted tenant connector; it is separate from an
+Agent's runtime/tool credentials. There are no global `sandbox.assetGitSecret`,
+`sandbox.assetPullSecret` or source-to-Agent Helm mappings.
+
+A referenced Secret must be in the Agent's namespace. Git Secrets contain
+`config.json` with a `hosts` map: HTTPS uses `username`/`password`; SSH uses
+`username`/`privateKey`/verified `knownHosts`. OCI Secrets use type
+`kubernetes.io/dockerconfigjson` and key `.dockerconfigjson`. Supply real values
+through your secret manager. The execution controller reads these Secrets; they
+are not mounted into Agent or asset-init containers. Agent-write RBAC must be
+restricted to people permitted to use the referenced credentials/connectors.
+
+For ACR federation, configure both `assetAccess.azure.tenantID` and
+`assetAccess.azure.clientID` and provision the matching Azure federated identity
+for this namespace's `<release>-execution-plane` service account. Its audience
+is `api://AzureADTokenExchange`; grant the identity the required repository pull
+access. The chart projects the federation token only into the controller.
+Missing/incomplete identity configuration fails; there is no anonymous fallback.
+
+Asset versions prepare in the background; admission uses a complete ready
+selection and checks current authorization. Agent status reports preparation
+state. The separate `assetValidation.size` emptyDir defaults to `2Gi`; it does
+not share receipt storage. `sandbox.storageClass` selects storage for newly
+created Sandbox PVCs; an empty value uses the cluster's default StorageClass.
+
 ## Local verification
 
 ```sh

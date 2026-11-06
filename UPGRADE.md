@@ -1,5 +1,7 @@
 # Upgrades and credential rotation
 
+This procedure applies only to compatible current-protocol installations. For an earlier execution version, follow the breaking cutover section below before attempting an upgrade or rotation.
+
 Preserve every receipt/Sandbox PVC and the installation and runtime-token identities. Settle active work and back up storage first. Read the exact supported transition in the portal/core release metadata. Selecting a target does not apply it.
 
 Helm does not upgrade CRDs. Review the new CRDs and apply them explicitly before upgrading the release:
