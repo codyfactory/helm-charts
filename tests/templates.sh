@@ -44,3 +44,29 @@ if helm template fixture "$chart" -f "$values" --set assetAccess.azure.clientID=
   echo 'Incomplete Azure identity unexpectedly accepted' >&2
   exit 1
 fi
+
+broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml)"
+rg -q 'name: fixture-broker-kubernetes' <<<"$broker"
+rg -q -- '--broker-listen=:8444' <<<"$broker"
+rg -q 'resources: \[tokenreviews\]' <<<"$broker"
+rg -q 'verbs: \[get, watch, impersonate\]' <<<"$broker"
+if rg -q 'fixture-broker-azure|serviceaccounts/token|IDENTITY_ENDPOINT|api://AzureADTokenExchange' <<<"$broker"; then
+  echo 'Kubernetes-only broker unexpectedly enables Azure access' >&2
+  exit 1
+fi
+azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true --set accessBroker.identities[0].identity.AzureClientID=client)"
+rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
+rg -q 'resources: \[serviceaccounts/token\]' <<<"$azure_broker"
+for invalid in 'accessBroker.tlsSecret=' 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true'; do
+  if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid broker configuration unexpectedly rendered: $invalid" >&2
+    exit 1
+  fi
+done
+cilium_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set networkPolicy.enabled=true,accessBroker.networkPolicy.provider=cilium)"
+rg -q 'kind: CiliumNetworkPolicy' <<<"$cilium_broker"
+rg -q 'port: "8443"' <<<"$cilium_broker"
+if rg -q 'matchName: management.azure.com|matchName: api.loganalytics.io' <<<"$cilium_broker"; then
+  echo 'Kubernetes-only broker unexpectedly enables Azure network destinations' >&2
+  exit 1
+fi

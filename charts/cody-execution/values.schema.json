@@ -309,6 +309,133 @@
           "const": "cody/codex-v1"
         }
       }
+    },
+    "accessBroker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "azure",
+        "networkPolicy"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "tlsSecret": {
+          "type": "string"
+        },
+        "feedTLSSecret": {
+          "type": "string"
+        },
+        "caSecret": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identityFreshness": {
+          "type": "string"
+        },
+        "identities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "agentUID",
+              "agentNamespace",
+              "agentName",
+              "identity"
+            ],
+            "properties": {
+              "agentUID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "agentNamespace": {
+                "type": "string",
+                "minLength": 1
+              },
+              "agentName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "identity": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "Namespace",
+                  "Name",
+                  "UID"
+                ],
+                "properties": {
+                  "Namespace": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "Name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "UID": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "AzureClientID": {
+                    "type": "string"
+                  },
+                  "AzureTenantID": {
+                    "type": "string"
+                  },
+                  "AzureObjectID": {
+                    "type": "string"
+                  },
+                  "AzureResourceID": {
+                    "type": "string"
+                  },
+                  "Audiences": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "networkPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "",
+                "cilium",
+                "external"
+              ]
+            },
+            "externalEnforcementConfigured": {
+              "type": "boolean"
+            }
+          }
+        },
+        "azure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
     }
   },
   "additionalProperties": false,

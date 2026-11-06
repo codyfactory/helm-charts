@@ -49,8 +49,16 @@ spec:
           command: [/cody-execution]
           args:
             - serve
+            {{- if $.Values.accessBroker.enabled }}
+            - --broker-listen=:8444
+            - --broker-tls-cert=/broker-feed-tls/tls.crt
+            - --broker-tls-key=/broker-feed-tls/tls.key
+            - --broker-config-file=/broker-config/config.json
+            - --broker-audience={{ $.Values.accessBroker.audience }}
+            - --broker-service-accounts={{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-kubernetes{{ if $.Values.accessBroker.azure.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-azure{{ end }}
+            {{- end }}
             - --protected-secrets
-            - {{ printf "%s,%s,%s" $installationToken $token $.Values.gatewayCASecret | quote }}
+            - {{ printf "%s,%s,%s,%s,%s" $installationToken $token $.Values.gatewayCASecret $.Values.accessBroker.tlsSecret $.Values.accessBroker.feedTLSSecret | quote }}
             - --namespace
             - {{ $.Release.Namespace }}
             - --execution-plane-url
@@ -103,6 +111,13 @@ spec:
             - {{ $.Values.sandbox.resources.limits.cpu | quote }}
             - --sandbox-memory-limit
             - {{ $.Values.sandbox.resources.limits.memory | quote }}
+          {{- if $.Values.accessBroker.enabled }}
+          env:
+            - name: CODY_EXECUTION_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+          {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz
@@ -112,6 +127,17 @@ spec:
               path: /healthz
               port: 8080
           volumeMounts:
+            {{- if $.Values.accessBroker.enabled }}
+            - name: broker-feed-tls
+              mountPath: /broker-feed-tls
+              readOnly: true
+            - name: broker-config
+              mountPath: /broker-config
+              readOnly: true
+            - name: broker-ca
+              mountPath: /broker-ca
+              readOnly: true
+            {{- end }}
             {{- if $.Values.assetAccess.azure.clientID }}
             - name: asset-access
               mountPath: /asset-access
@@ -141,6 +167,17 @@ spec:
               readOnly: true
             {{- end }}
       volumes:
+        {{- if $.Values.accessBroker.enabled }}
+        - name: broker-feed-tls
+          secret:
+            secretName: {{ $.Values.accessBroker.feedTLSSecret | quote }}
+        - name: broker-config
+          configMap:
+            name: {{ $.Release.Name }}-broker-config
+        - name: broker-ca
+          secret:
+            secretName: {{ $.Values.accessBroker.caSecret | quote }}
+        {{- end }}
         - name: asset-validation
           emptyDir:
             sizeLimit: {{ $.Values.assetValidation.size | quote }}
