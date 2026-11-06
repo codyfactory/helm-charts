@@ -2,7 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-The initial source PR is a **release candidate**. `index.yaml` intentionally contains no releases until a maintainer publishes real public image digests and the matching chart package. Do not treat synthetic example digests or core test packages as published artifacts.
+Published chart versions are listed in `index.yaml`. Each release pins public image digests. Synthetic example values and core test packages are not customer releases.
 
 ## Install
 
