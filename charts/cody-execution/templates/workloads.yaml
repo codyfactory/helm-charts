@@ -51,6 +51,8 @@ spec:
             - serve
             {{- if $.Values.accessBroker.enabled }}
             - --broker-listen=:8444
+            - --broker-client-ca-cert=/broker-client-signer/tls.crt
+            - --broker-client-ca-key=/broker-client-signer/tls.key
             - --broker-tls-cert=/broker-feed-tls/tls.crt
             - --broker-tls-key=/broker-feed-tls/tls.key
             - --broker-config-file=/broker-config/config.json
@@ -58,7 +60,7 @@ spec:
             - --broker-service-accounts={{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-kubernetes{{ if $.Values.accessBroker.azure.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-azure{{ end }}
             {{- end }}
             - --protected-secrets
-            - {{ printf "%s,%s,%s,%s,%s" $installationToken $token $.Values.gatewayCASecret $.Values.accessBroker.tlsSecret $.Values.accessBroker.feedTLSSecret | quote }}
+            - {{ printf "%s,%s,%s,%s,%s,%s" $installationToken $token $.Values.gatewayCASecret $.Values.accessBroker.tlsSecret $.Values.accessBroker.feedTLSSecret $.Values.accessBroker.clientSigningSecret | quote }}
             - --namespace
             - {{ $.Release.Namespace }}
             - --execution-plane-url
@@ -128,6 +130,9 @@ spec:
               port: 8080
           volumeMounts:
             {{- if $.Values.accessBroker.enabled }}
+            - name: broker-client-signer
+              mountPath: /broker-client-signer
+              readOnly: true
             - name: broker-feed-tls
               mountPath: /broker-feed-tls
               readOnly: true
@@ -168,6 +173,10 @@ spec:
             {{- end }}
       volumes:
         {{- if $.Values.accessBroker.enabled }}
+        - name: broker-client-signer
+          secret:
+            secretName: {{ $.Values.accessBroker.clientSigningSecret | quote }}
+            defaultMode: 0400
         - name: broker-feed-tls
           secret:
             secretName: {{ $.Values.accessBroker.feedTLSSecret | quote }}

@@ -335,6 +335,8 @@
         "caSecret": {
           "type": "string"
         },
+        "clientCASecret": {"type": "string"},
+        "clientSigningSecret": {"type": "string"},
         "audience": {
           "type": "string",
           "minLength": 1

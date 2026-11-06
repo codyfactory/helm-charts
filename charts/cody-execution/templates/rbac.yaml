@@ -5,7 +5,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [secrets]
-    verbs: [get]
+    verbs: [get{{ if .Values.accessBroker.enabled }}, create, update, delete{{ end }}]
   - apiGroups: [execution.cody.so]
     resources: [agents, workflows]
     verbs: [get, list, watch]

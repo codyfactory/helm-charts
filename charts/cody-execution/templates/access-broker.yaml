@@ -6,6 +6,9 @@
 {{- $tls := required "accessBroker.tlsSecret is required" $broker.tlsSecret -}}
 {{- $feedTLS := required "accessBroker.feedTLSSecret is required" $broker.feedTLSSecret -}}
 {{- $ca := required "accessBroker.caSecret is required" $broker.caSecret -}}
+{{- $clientCA := required "accessBroker.clientCASecret is required" $broker.clientCASecret -}}
+{{- $signer := required "accessBroker.clientSigningSecret is required" $broker.clientSigningSecret -}}
+{{- if or (eq $clientCA $signer) (eq $signer $tls) (eq $signer $feedTLS) (eq $signer $ca) -}}{{- fail "Runtime client signing Secret must be dedicated and separate from broker mounts" -}}{{- end -}}
 {{- if lt (int $broker.replicas) 2 -}}{{- fail "accessBroker.replicas must be at least 2" -}}{{- end -}}
 {{- if not (or (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
 {{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
@@ -47,6 +50,9 @@ spec:
           args:
             - broker
             - --mode={{ $mode }}
+            - --installation={{ $.Values.installation }}
+            - --sandbox-namespace={{ $.Release.Namespace }}
+            - --client-ca=/etc/cody/client-ca/ca.crt
             - --listen=:8443
             - --tls-cert=/etc/cody/broker-tls/tls.crt
             - --tls-key=/etc/cody/broker-tls/tls.key
@@ -77,6 +83,9 @@ spec:
               path: /healthz
               port: 8081
           volumeMounts:
+            - name: client-ca
+              mountPath: /etc/cody/client-ca
+              readOnly: true
             - name: tls
               mountPath: /etc/cody/broker-tls
               readOnly: true
@@ -87,6 +96,12 @@ spec:
               mountPath: /var/run/secrets/cody-broker
               readOnly: true
       volumes:
+        - name: client-ca
+          secret:
+            secretName: {{ $clientCA | quote }}
+            items:
+              - key: ca.crt
+                path: ca.crt
         - name: tls
           secret:
             secretName: {{ $tls | quote }}

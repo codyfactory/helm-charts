@@ -57,7 +57,7 @@ fi
 azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true --set accessBroker.identities[0].identity.AzureClientID=client)"
 rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
 rg -q 'resources: \[serviceaccounts/token\]' <<<"$azure_broker"
-for invalid in 'accessBroker.tlsSecret=' 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true'; do
+for invalid in 'accessBroker.tlsSecret=' 'accessBroker.clientCASecret=' 'accessBroker.clientSigningSecret=' 'accessBroker.clientSigningSecret=broker-client-ca' 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true'; do
   if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set "$invalid" >/dev/null 2>&1; then
     echo "Invalid broker configuration unexpectedly rendered: $invalid" >&2
     exit 1
@@ -70,3 +70,7 @@ if rg -q 'matchName: management.azure.com|matchName: api.loganalytics.io' <<<"$c
   echo 'Kubernetes-only broker unexpectedly enables Azure network destinations' >&2
   exit 1
 fi
+
+rg -q -- '--client-ca=/etc/cody/client-ca/ca.crt' <<<"$broker"
+rg -q -- '--broker-client-ca-key=/broker-client-signer/tls.key' <<<"$broker"
+rg -q 'verbs: \[get, create, update, delete\]' <<<"$broker"
