@@ -1,0 +1,316 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: workflows.execution.cody.so
+spec:
+  group: execution.cody.so
+  names:
+    kind: Workflow
+    plural: workflows
+    singular: workflow
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [agent]
+              x-kubernetes-validations:
+                - rule: "(has(self.github) ? 1 : 0) + (has(self.source) ? 1 : 0) + (has(self.schedule) ? 1 : 0) == 1"
+                  message: Specify exactly one Workflow source
+                - rule: "!has(self.githubWorkflow) || (has(self.source) && self.source.provider == 'github')"
+                  message: A GitHub workflow requires a GitHub source
+                - rule: "!has(self.schedule) || has(self.sandbox)"
+                  message: A scheduled Workflow requires explicit sandbox continuity
+                - rule: "!has(self.sandbox) || has(self.schedule)"
+                  message: Explicit sandbox continuity requires a schedule
+              properties:
+                sandbox:
+                  type: object
+                  required: [continuity]
+                  properties:
+                    continuity:
+                      type: string
+                      enum: [fresh, reuse]
+                schedule:
+                  type: object
+                  required: [cron, timezone, policies, reporting]
+                  properties:
+                    reporting:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                      maxProperties: 1
+                      required: [slack]
+                      properties:
+                        slack:
+                          type: object
+                          required: [connectorRef, channelID]
+                          properties:
+                            connectorRef:
+                              type: string
+                              pattern: '^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$'
+                            channelID:
+                              type: string
+                              pattern: '^[CG][A-Z0-9]{1,127}$'
+                    cron:
+                      type: string
+                      minLength: 9
+                      maxLength: 128
+                      pattern: '^\S+ \S+ \S+ \S+ \S+$'
+                    timezone:
+                      type: string
+                      minLength: 1
+                      maxLength: 128
+                    paused:
+                      type: boolean
+                      default: false
+                    policies:
+                      type: object
+                      required: [missedRun, catchupWindow, overlap]
+                      properties:
+                        missedRun:
+                          type: string
+                          enum: [skip, latest]
+                        catchupWindow:
+                          type: string
+                          minLength: 2
+                          maxLength: 32
+                          pattern: '^([0-9]+(\.[0-9]+)?(h|m|s|ms))+$'
+                          x-kubernetes-validations:
+                            - rule: "duration(self) > duration('0s')"
+                              message: The catch-up window must be positive
+                        overlap:
+                          type: string
+                          enum: [skip, bufferOne]
+                agent:
+                  type: string
+                  minLength: 1
+                  maxLength: 63
+                github:
+                  type: object
+                  required: [connectorRef, repository, "on", reporting]
+                  properties:
+                    paths:
+                      type: object
+                      required: [excludePrefixes, onAllExcluded]
+                      properties:
+                        excludePrefixes:
+                          type: array
+                          description: Literal, case-sensitive repository-relative directory prefixes ending in a slash.
+                          minItems: 1
+                          maxItems: 8
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            maxLength: 96
+                            pattern: '^([A-Za-z0-9._ -]+/)+$'
+                            x-kubernetes-validations:
+                              - rule: "!self.matches('(^|/)[.]{1,2}/')"
+                                message: Directory prefixes must contain no dot or parent segments
+                        onAllExcluded:
+                          type: string
+                          enum: [pass]
+                    connectorRef:
+                      type: string
+                      minLength: 1
+                      maxLength: 63
+                      pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                    repository:
+                      type: string
+                      maxLength: 140
+                      pattern: '^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$'
+                      x-kubernetes-validations:
+                        - rule: "!self.endsWith('/.') && !self.endsWith('/..')"
+                          message: Specify a repository name
+                    "on":
+                      type: object
+                      minProperties: 1
+                      properties:
+                        pullRequest:
+                          type: object
+                          required: [actions]
+                          x-kubernetes-validations:
+                            - rule: "!has(self.changedLabels) || 'labeled' in self.actions || 'unlabeled' in self.actions"
+                              message: changedLabels requires a labeled or unlabeled action
+                          properties:
+                            actions:
+                              type: array
+                              minItems: 1
+                              maxItems: 6
+                              x-kubernetes-list-type: set
+                              items:
+                                type: string
+                                enum: [opened, reopened, ready_for_review, synchronize, labeled, unlabeled]
+                            baseBranch:
+                              type: string
+                              minLength: 1
+                              maxLength: 255
+                            labels:
+                              type: array
+                              minItems: 1
+                              maxItems: 32
+                              x-kubernetes-list-type: set
+                              items:
+                                type: string
+                                minLength: 1
+                                maxLength: 50
+                            excludeLabels:
+                              type: array
+                              minItems: 1
+                              maxItems: 32
+                              x-kubernetes-list-type: set
+                              items:
+                                type: string
+                                minLength: 1
+                                maxLength: 50
+                            changedLabels:
+                              type: array
+                              minItems: 1
+                              maxItems: 32
+                              x-kubernetes-list-type: set
+                              items:
+                                type: string
+                                minLength: 1
+                                maxLength: 50
+                        findingReply:
+                          type: object
+                          properties:
+                            requireMention:
+                              type: boolean
+                              default: true
+                    reporting:
+                      type: object
+                      required: [checkName]
+                      properties:
+                        checkName:
+                          type: string
+                          minLength: 1
+                          maxLength: 100
+                githubWorkflow:
+                  type: object
+                  required: [checkName, baseBranch, actions]
+                  properties:
+                    paths:
+                      type: object
+                      required: [excludePrefixes, onAllExcluded]
+                      properties:
+                        excludePrefixes:
+                          type: array
+                          description: Literal, case-sensitive repository-relative directory prefixes ending in a slash.
+                          minItems: 1
+                          maxItems: 8
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            maxLength: 96
+                            pattern: '^([A-Za-z0-9._ -]+/)+$'
+                            x-kubernetes-validations:
+                              - rule: "!self.matches('(^|/)[.]{1,2}/')"
+                                message: Directory prefixes must contain no dot or parent segments
+                        onAllExcluded:
+                          type: string
+                          enum: [pass]
+                    checkName:
+                      type: string
+                      minLength: 1
+                      maxLength: 100
+                    baseBranch:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    actions:
+                      type: array
+                      x-kubernetes-list-type: set
+                      minItems: 1
+                      maxItems: 4
+                      items:
+                        type: string
+                        enum: [opened, reopened, ready_for_review, synchronize]
+                source:
+                  type: object
+                  required: [provider, connectorID]
+                  x-kubernetes-validations:
+                    - rule: has(self.resourceID) != has(self.channels)
+                      message: Specify exactly one of resourceID or channels
+                    - rule: "!has(self.channels) || self.provider == 'slack'"
+                      message: channels requires the Slack provider
+                    - rule: "!has(self.channels) || !('*' in self.channels) || size(self.channels) == 1"
+                      message: A wildcard must be the only channel selector
+                    - rule: >-
+                        self.provider != 'github' || (has(self.resourceID) && self.resourceID.matches('^[1-9][0-9]{0,18}$') && (size(self.resourceID) < 19 || self.resourceID <= '9223372036854775807'))
+                      message: GitHub resourceID must be a canonical positive 64-bit repository ID
+                  properties:
+                    provider:
+                      type: string
+                      enum: [github, slack, operator]
+                    connectorID:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                    channels:
+                      type: array
+                      x-kubernetes-list-type: set
+                      minItems: 1
+                      maxItems: 256
+                      items:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                        pattern: '^([A-Z][A-Z0-9]+|\*)$'
+                    resourceID:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+            status:
+              type: object
+              properties:
+                schedule:
+                  type: object
+                  properties:
+                    nextFireTime:
+                      type: string
+                      format: date-time
+                    latest:
+                      type: object
+                      properties:
+                        commandID:
+                          type: string
+                        nominalTime:
+                          type: string
+                          format: date-time
+                        startDeadline:
+                          type: string
+                          format: date-time
+                        startedAt:
+                          type: string
+                          format: date-time
+                        state:
+                          type: string
+                        reason:
+                          type: string
+                        sandboxResetReason:
+                          type: string
+                resolved:
+                  type: boolean
+                reason:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                source:
+                  type: object
+                  properties:
+                    provider:
+                      type: string
+                    connectorID:
+                      type: string
+                    resourceID:
+                      type: string

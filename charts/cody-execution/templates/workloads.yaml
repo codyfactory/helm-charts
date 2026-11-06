@@ -1,0 +1,200 @@
+{{- $installation := required "installation is required" .Values.installation -}}
+{{- $gateway := required "gatewayURL is required" .Values.gatewayURL -}}
+{{- $installationToken := include "cody.installationSecret" . -}}
+{{- $token := include "cody.runtimeSecret" . -}}
+{{- $role := "execution-plane" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  replicas: 1
+  serviceName: {{ $.Release.Name }}-execution-plane-headless
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  volumeClaimTemplates:
+    - metadata:
+        name: receipts
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with $.Values.receipts.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $.Values.receipts.size | quote }}
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-{{ $role }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-{{ $role }}
+    spec:
+      securityContext:
+        fsGroup: 65532
+      terminationGracePeriodSeconds: 45
+      serviceAccountName: {{ $.Release.Name }}-{{ $role }}
+      containers:
+        - name: {{ $role }}
+          image: {{ $.Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/cody-execution]
+          args:
+            - serve
+            - --protected-secrets
+            - {{ printf "%s,%s,%s" $installationToken $token $.Values.gatewayCASecret | quote }}
+            - --namespace
+            - {{ $.Release.Namespace }}
+            - --execution-plane-url
+            - http://{{ $.Release.Name }}-execution-plane:8080
+            - --kube-api-qps
+            - {{ $.Values.kubernetes.qps | quote }}
+            - --kube-api-burst
+            - {{ $.Values.kubernetes.burst | quote }}
+            - --kube-api-timeout
+            - {{ $.Values.kubernetes.requestTimeout | quote }}
+            - --runtime-token-file
+            - /runtime-auth/token
+            - --scheduling-policy-file
+            - /scheduling/policy.json
+            - --sandbox-idle-timeout
+            - {{ $.Values.sandbox.idleTimeout | quote }}
+            - --sandbox-retention
+            - {{ $.Values.sandbox.retention | quote }}
+            - --asset-validation-directory
+            - /var/lib/cody/asset-validation
+            - --receipt-log
+            - /receipts/admission.sqlite
+            - --installation
+            - {{ $installation | quote }}
+            - --gateway-url
+            - {{ $gateway | quote }}
+            - --installation-token-file
+            - /installation/token
+            {{- with $.Values.gatewayCASecret }}
+            - --server-ca
+            - /gateway-ca/ca.crt
+            {{- end }}
+            - --provisioning-timeout
+            - {{ required "provisioningTimeout is required" $.Values.provisioningTimeout | quote }}
+            {{- if $.Values.assetAccess.azure.clientID }}
+            - --asset-access-config
+            - /asset-access/config.json
+            {{- end }}
+            {{- with $.Values.sandbox.storageClass }}
+            - --sandbox-storage-class
+            - {{ . | quote }}
+            {{- end }}
+            - --sandbox-workspace-size
+            - {{ $.Values.sandbox.workspaceSize | quote }}
+            - --sandbox-cpu-request
+            - {{ $.Values.sandbox.resources.requests.cpu | quote }}
+            - --sandbox-memory-request
+            - {{ $.Values.sandbox.resources.requests.memory | quote }}
+            - --sandbox-cpu-limit
+            - {{ $.Values.sandbox.resources.limits.cpu | quote }}
+            - --sandbox-memory-limit
+            - {{ $.Values.sandbox.resources.limits.memory | quote }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          volumeMounts:
+            {{- if $.Values.assetAccess.azure.clientID }}
+            - name: asset-access
+              mountPath: /asset-access
+              readOnly: true
+            {{- if $.Values.assetAccess.azure.clientID }}
+            - name: asset-azure-token
+              mountPath: /run/cody/azure
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            - name: scheduling
+              mountPath: /scheduling
+              readOnly: true
+            - name: runtime-auth
+              mountPath: /runtime-auth
+              readOnly: true
+            - name: asset-validation
+              mountPath: /var/lib/cody/asset-validation
+            - name: receipts
+              mountPath: /receipts
+            - name: installation
+              mountPath: /installation
+              readOnly: true
+            {{- with $.Values.gatewayCASecret }}
+            - name: gateway-ca
+              mountPath: /gateway-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: asset-validation
+          emptyDir:
+            sizeLimit: {{ $.Values.assetValidation.size | quote }}
+        {{- if $.Values.assetAccess.azure.clientID }}
+        - name: asset-access
+          configMap:
+            name: {{ $.Release.Name }}-asset-access
+        {{- if $.Values.assetAccess.azure.clientID }}
+        - name: asset-azure-token
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: api://AzureADTokenExchange
+                  expirationSeconds: 3600
+                  path: token
+        {{- end }}
+        {{- end }}
+        - name: scheduling
+          configMap:
+            name: {{ $.Release.Name }}-scheduling
+        - name: runtime-auth
+          secret:
+            secretName: {{ $token | quote }}
+        - name: installation
+          secret:
+            secretName: {{ $installationToken | quote }}
+        {{- with $.Values.gatewayCASecret }}
+        - name: gateway-ca
+          secret:
+            secretName: {{ . | quote }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-execution-plane
+spec:
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ .Release.Name }}-execution-plane
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-execution-plane-headless
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-execution-plane
+  ports:
+    - port: 8080
+      targetPort: 8080

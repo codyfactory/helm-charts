@@ -1,0 +1,44 @@
+image: ""
+installation: ""
+gatewayURL: ""
+installationToken: ""
+installationTokenSecret: ""
+gatewayCASecret: ""
+runtimeTokenSecret: ""
+provisioningTimeout: 30m
+kubernetes:
+  qps: 20
+  burst: 40
+  requestTimeout: 30s
+receipts:
+  size: 1Gi
+  storageClass: ""
+  initializeOnInstall: false
+sandbox:
+  storageClass: ""
+  workspaceSize: 1Gi
+  idleTimeout: 15m
+  retention: 720h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+networkPolicy:
+  enabled: false
+  toolDomains: []
+scheduling: {}
+
+onboarding:
+  enabled: false
+  image: ""
+  model: cody/codex-v1
+assetAccess:
+  azure:
+    tenantID: ""
+    clientID: ""
+
+assetValidation:
+  size: 2Gi

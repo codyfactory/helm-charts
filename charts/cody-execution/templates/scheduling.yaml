@@ -1,0 +1,55 @@
+{{- $policy := .Values.scheduling -}}
+{{- if gt (int $policy.default_source_active_limit) (int $policy.active_turns) -}}
+{{- fail "default source limit exceeds active turns" -}}
+{{- end -}}
+{{- if gt (int $policy.default_lane_active_limit) (int $policy.default_source_active_limit) -}}
+{{- fail "default lane limit exceeds default source limit" -}}
+{{- end -}}
+{{- range concat ($policy.source_overrides | default list) ($policy.lane_overrides | default list) -}}
+{{- $r := .resource -}}
+{{- range list $r.namespace $r.resource_id -}}
+{{- if or (ne . (trim .)) (gt (len .) 256) (contains "\x00" .) (contains "\r" .) (contains "\n" .) -}}
+{{- fail "invalid scheduling resource key" -}}
+{{- end -}}
+{{- end -}}
+{{- if eq $r.provider "github" -}}
+{{- if or (ne $r.namespace "github.com") (not (regexMatch "^[1-9][0-9]{0,18}$" $r.resource_id)) (and (eq (len $r.resource_id) 19) (gt $r.resource_id "9223372036854775807")) -}}
+{{- fail "GitHub scheduling overrides require github.com and a canonical positive int64 repository ID" -}}
+{{- end -}}
+{{- else if and (eq $r.provider "schedule") (or (ne $r.namespace "scheduler") (not (regexMatch "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?/[a-z0-9]([a-z0-9.-]*[a-z0-9])?$" $r.resource_id))) -}}
+{{- fail "schedule overrides require scheduler and a namespace/name resource" -}}
+{{- else if and (eq $r.provider "operator") (or (ne $r.namespace "installation") (ne $r.resource_id "operator")) -}}
+{{- fail "invalid operator scheduling resource" -}}
+{{- end -}}
+{{- end -}}
+{{- $sources := dict -}}
+{{- range $policy.source_overrides -}}
+{{- $key := list .resource.provider .resource.namespace .resource.resource_id | toJson -}}
+{{- if hasKey $sources $key -}}{{- fail "duplicate scheduling source override" -}}{{- end -}}
+{{- if or (gt (int .active_limit) (int $policy.active_turns)) (lt (int .active_limit) (int $policy.default_lane_active_limit)) -}}
+{{- fail "inconsistent scheduling source override" -}}
+{{- end -}}
+{{- $_ := set $sources $key .active_limit -}}
+{{- end -}}
+{{- $lanes := dict -}}
+{{- range $policy.lane_overrides -}}
+{{- if and (has .resource.provider (list "github" "slack" "schedule")) (not (hasPrefix "route:" .lane_id)) -}}
+{{- fail "GitHub, Slack and schedule lane overrides require route:<Workflow UID>" -}}
+{{- else if and (eq .resource.provider "operator") (not (hasPrefix "agent:" .lane_id)) -}}
+{{- fail "operator lane overrides require agent:<Agent UID>" -}}
+{{- end -}}
+{{- $key := list .resource.provider .resource.namespace .resource.resource_id | toJson -}}
+{{- $lane := list $key .lane_id | toJson -}}
+{{- if hasKey $lanes $lane -}}{{- fail "duplicate scheduling lane override" -}}{{- end -}}
+{{- $_ := set $lanes $lane true -}}
+{{- $sourceLimit := $policy.default_source_active_limit -}}
+{{- if hasKey $sources $key -}}{{- $sourceLimit = get $sources $key -}}{{- end -}}
+{{- if gt (int .active_limit) (int $sourceLimit) -}}{{- fail "lane override exceeds source limit" -}}{{- end -}}
+{{- end -}}
+{{- if gt (len ($policy | toJson)) 61440 -}}{{- fail "scheduling policy exceeds wire budget" -}}{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-scheduling
+data:
+  policy.json: {{ $policy | toJson | quote }}

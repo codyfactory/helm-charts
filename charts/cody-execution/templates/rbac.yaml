@@ -1,0 +1,42 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-execution-plane
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get]
+  - apiGroups: [execution.cody.so]
+    resources: [agents, workflows]
+    verbs: [get, list, watch]
+  - apiGroups: [execution.cody.so]
+    resources: [agents/status]
+    verbs: [update]
+  - apiGroups: [execution.cody.so]
+    resources: [workflows/status]
+    verbs: [patch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, delete]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [create, get, list, delete]
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    verbs: [get, list, watch, create, patch, delete]
+---
+{{- range $role := list "execution-plane" }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $.Release.Name }}-{{ $role }}
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $.Release.Name }}-{{ $role }}
+---
+{{- end }}
