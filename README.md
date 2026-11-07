@@ -90,6 +90,8 @@ The example digests and token are synthetic lint fixtures. Real controller/nativ
 
 No Actions or Pages deployment is required. Authenticate Git through your usual GitHub credentials. Never overwrite any published version, tag or package. First build/push public execution/general/SRE images from the same clean core commit and verify anonymous amd64/arm64 pulls, following the core [rollout guide](https://github.com/codyfactory/cody/blob/codex/saas-onboarding-v2-spec/deploy/fly/SAAS-HELM.md).
 
+The `0.6.0` source candidate retains the published `0.5.0` image defaults until publication. Re-pin compatible execution and runtime images before publishing: the broker now receives `--transport-mode` and `--kube-api-qps`, which the `0.5.0` execution image does not support.
+
 Set a **new unused version** in `charts/cody-execution/Chart.yaml`. Pin `values.yaml`'s `image` and `onboarding.image` to the real public execution and general-runtime digests. Validate with actual production values (never commit private values). Then:
 
 ```sh
