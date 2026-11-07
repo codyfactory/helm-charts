@@ -2,6 +2,21 @@
 set -euo pipefail
 chart=charts/cody-execution
 values=examples/lint-values.yaml
+validate_documents() {
+  awk '
+    function check() {
+      if ((versions || kinds) && (versions != 1 || kinds != 1)) {
+        print "Rendered YAML document must contain exactly one apiVersion and kind" > "/dev/stderr"
+        invalid = 1
+      }
+      versions = kinds = 0
+    }
+    /^---[[:space:]]*$/ { check() }
+    /^apiVersion:/ { versions++ }
+    /^kind:/ { kinds++ }
+    END { check(); exit invalid }
+  '
+}
 rendered="$(helm template fixture "$chart" -f "$values")"
 rg -q -- '--fresh-only' <<<"$rendered"
 rg -q -- 'name: fixture-runtime-auth' <<<"$rendered"
@@ -162,4 +177,14 @@ for mode in broker azure_broker; do
     echo 'Disabled Azure broker unexpectedly receives TokenReview permissions' >&2
     exit 1
   fi
+done
+
+for azure in false true; do
+  for transport in mesh plaintext tls; do
+    args=(--set "networkPolicy.enabled=true,accessBroker.networkPolicy.provider=cilium,accessBroker.azure.enabled=$azure,accessBroker.transport.mode=$transport")
+    if [[ "$transport" == tls ]]; then
+      args+=(--set accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls,accessBroker.caSecret=trust)
+    fi
+    helm template fixture "$chart" -f "$values" -f examples/broker.yaml "${args[@]}" | validate_documents
+  done
 done
