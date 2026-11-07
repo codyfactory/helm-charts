@@ -2,7 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-The initial source PR is a **release candidate**. `index.yaml` intentionally contains no releases until a maintainer publishes real public image digests and the matching chart package. Do not treat synthetic example digests or core test packages as published artifacts.
+Chart `0.5.0` is published on `main` under the immutable `cody-execution-0.5.0` tag. This branch contains the `0.6.0` **source candidate**, which adds AccessProfile configuration and is not a published release. Do not treat synthetic example digests or core test packages as published artifacts.
 
 ## Install
 
@@ -93,7 +93,7 @@ No Actions or Pages deployment is required. Authenticate Git through your usual 
 Set a **new unused version** in `charts/cody-execution/Chart.yaml`. Pin `values.yaml`'s `image` and `onboarding.image` to the real public execution and general-runtime digests. Validate with actual production values (never commit private values). Then:
 
 ```sh
-export CODY_CHART_VERSION=0.5.0
+export CODY_CHART_VERSION=0.6.0
 export CODY_CORE_COMMIT=EXACT_40_CHARACTER_CORE_COMMIT
 export CODY_SRE_IMAGE=ghcr.io/codyfactory/cody-runtime-sre@sha256:REAL_DIGEST
 
@@ -113,7 +113,7 @@ git push origin HEAD
 # Merge that publication PR before tagging its exact main commit.
 ```
 
-After merge, checkout/pull main and create the immutable `cody-execution-<version>` tag on the publication commit. Preserve all old packages/index entries. Verify anonymous acquisition with an empty Helm repository config before adding the supported release descriptor to core. The descriptor records package URL, byte size, SHA256, core commit, image digests, protocol, chart/runtime versions and explicitly tested transitions. Do not infer runtime version from chart version. Do not activate a descriptor for this empty candidate index.
+After merge, checkout/pull main and create the immutable `cody-execution-<version>` tag on the publication commit. Preserve all old packages/index entries. Verify anonymous acquisition with an empty Helm repository config before adding the supported release descriptor to core. The descriptor records package URL, byte size, SHA256, core commit, image digests, protocol, chart/runtime versions and explicitly tested transitions. Do not infer runtime version from chart version. Do not activate a descriptor for the `0.6.0` source candidate before its package and images are published.
 
 Only chart sources, generic CRDs, packages/index and public docs belong here. No credentials, kubeconfigs, private values, company tooling or application source.
 
@@ -137,7 +137,7 @@ spec:
   # azure:
   #   tenantID: "<tenant-id>"
   #   clientID: "<client-id>"
-  #   allowedResources: [https://management.azure.com]
+  #   allowedResources: [https://management.core.windows.net/, https://management.azure.com]
 ```
 
 Add `accessProfileRef: {name: sre-reader}` to the existing Agent's `spec`. Profile readiness reports whether configuration and the selected ServiceAccount resolve; it does not prove Azure federation or resource permissions. Access-affecting profile changes revoke frozen access according to the execution controller's observation/renewal behavior; metadata changes do not switch the identity of an active turn. Previously issued Azure tokens retain their provider expiry.
