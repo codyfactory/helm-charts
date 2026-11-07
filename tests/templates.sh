@@ -63,6 +63,11 @@ if rg -q 'fixture-broker-azure|serviceaccounts/token|impersonate|IDENTITY_ENDPOI
 fi
 azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true)"
 rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
+test "$(rg -c -- '--kube-api-qps=20' <<<"$azure_broker")" = 2
+test "$(rg -c -- '--kube-api-burst=40' <<<"$azure_broker")" = 2
+broker_limits="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true,kubernetes.burst=25 --set-json kubernetes.qps=12.5)"
+test "$(rg -c -- '--kube-api-qps=12.5' <<<"$broker_limits")" = 2
+test "$(rg -c -- '--kube-api-burst=25' <<<"$broker_limits")" = 2
 if rg -q 'serviceaccounts/token|impersonate' <<<"$azure_broker"; then
   echo 'Chart must not create admin-owned selected-identity grants' >&2
   exit 1

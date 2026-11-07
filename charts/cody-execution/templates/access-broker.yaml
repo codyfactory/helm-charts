@@ -61,6 +61,8 @@ spec:
           args:
             - broker
             - --mode={{ $mode }}
+            - --kube-api-qps={{ $.Values.kubernetes.qps }}
+            - --kube-api-burst={{ $.Values.kubernetes.burst }}
             - --sandbox-service-account={{ $.Release.Name }}-sandbox
             - --sandbox-namespace={{ $.Release.Namespace }}
             - --listen=:8443
