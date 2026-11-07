@@ -45,24 +45,69 @@ if helm template fixture "$chart" -f "$values" --set assetAccess.azure.clientID=
   exit 1
 fi
 
-broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml)"
+broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --include-crds)"
 rg -q 'name: fixture-broker-kubernetes' <<<"$broker"
 rg -q -- '--broker-listen=:8444' <<<"$broker"
+rg -q -- '--transport-mode=mesh' <<<"$broker"
+rg -q -- '--feed-transport-mode=mesh' <<<"$broker"
+rg -q -- '--broker-feed-transport-mode=mesh' <<<"$broker"
+rg -q -- '--feed-url=http://fixture-broker-feed.default.svc.cluster.local:8444' <<<"$broker"
+rg -q '"transportMode":"mesh"' <<<"$broker"
+rg -q 'name: accessprofiles.execution.cody.so' <<<"$broker"
+rg -q 'accessProfileRef:' <<<"$broker"
+rg -q 'resources: \[accessprofiles/status\]' <<<"$broker"
 rg -q 'resources: \[tokenreviews\]' <<<"$broker"
-rg -q 'verbs: \[get, watch, impersonate\]' <<<"$broker"
-if rg -q 'fixture-broker-azure|serviceaccounts/token|IDENTITY_ENDPOINT|api://AzureADTokenExchange' <<<"$broker"; then
-  echo 'Kubernetes-only broker unexpectedly enables Azure access' >&2
+if rg -q 'fixture-broker-azure|serviceaccounts/token|impersonate|IDENTITY_ENDPOINT|api://AzureADTokenExchange|--tls-cert|--broker-tls-cert|--feed-ca|"identities"' <<<"$broker"; then
+  echo 'Kubernetes-only mesh broker rendered privileged identity grants, TLS, or Azure access' >&2
   exit 1
 fi
-azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true --set accessBroker.identities[0].identity.AzureClientID=client)"
+azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true)"
 rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
-rg -q 'resources: \[serviceaccounts/token\]' <<<"$azure_broker"
-for invalid in 'accessBroker.tlsSecret=' 'accessBroker.caSecret=' 'accessBroker.feedTLSSecret=' 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true'; do
+if rg -q 'serviceaccounts/token|impersonate' <<<"$azure_broker"; then
+  echo 'Chart must not create admin-owned selected-identity grants' >&2
+  exit 1
+fi
+for invalid in 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true' 'accessBroker.transport.mode=invalid' 'accessBroker.tlsSecret=unexpected' 'accessBroker.caSecret=unexpected' 'accessBroker.transport.mode=tls' 'accessBroker.identities[0].agentUID=retired'; do
   if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set "$invalid" >/dev/null 2>&1; then
     echo "Invalid broker configuration unexpectedly rendered: $invalid" >&2
     exit 1
   fi
 done
+plaintext="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=plaintext)"
+rg -q -- '--transport-mode=plaintext' <<<"$plaintext"
+rg -q -- '--broker-feed-transport-mode=plaintext' <<<"$plaintext"
+tls="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls,accessBroker.caSecret=trust)"
+rg -q -- '--tls-cert=/etc/cody/broker-tls/tls.crt' <<<"$tls"
+rg -q -- '--broker-tls-cert=/broker-feed-tls/tls.crt' <<<"$tls"
+rg -q -- '--feed-url=https://fixture-broker-feed.default.svc.cluster.local:8444' <<<"$tls"
+rg -q 'secretName: "trust"' <<<"$tls"
+for invalid in 'accessBroker.tlsSecret=' 'accessBroker.feedTLSSecret='; do
+  if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls --set "$invalid" >/dev/null 2>&1; then
+    echo "Incomplete TLS configuration unexpectedly rendered: $invalid" >&2
+    exit 1
+  fi
+done
+system_roots="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls)"
+if rg -q -- '--feed-ca|mountPath: /broker-ca' <<<"$system_roots"; then
+  echo 'System-root TLS unexpectedly mounts an empty custom CA' >&2
+  exit 1
+fi
+mixed="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.brokerToFeed.mode=tls,accessBroker.feedTLSSecret=feed-tls,accessBroker.caSecret=trust)"
+rg -q -- '--transport-mode=mesh' <<<"$mixed"
+rg -q -- '--feed-transport-mode=tls' <<<"$mixed"
+rg -q -- '--broker-tls-cert=/broker-feed-tls/tls.crt' <<<"$mixed"
+if rg -q -- '--tls-cert=|mountPath: /broker-ca' <<<"$mixed"; then
+  echo 'HTTP sandbox leg unexpectedly configures TLS' >&2
+  exit 1
+fi
+managed="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.azure.enabled=true)"
+test "$(rg -c '^kind: Certificate$' <<<"$managed")" = 2
+rg -q 'secretName: fixture-broker-tls' <<<"$managed"
+rg -q 'fixture-broker-azure.default.svc.cluster.local' <<<"$managed"
+if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.tlsSecret=ambiguous >/dev/null 2>&1; then
+  echo 'Mixed managed and existing TLS Secrets unexpectedly rendered' >&2
+  exit 1
+fi
 cilium_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set networkPolicy.enabled=true,accessBroker.networkPolicy.provider=cilium)"
 rg -q 'kind: CiliumNetworkPolicy' <<<"$cilium_broker"
 rg -q 'port: "8443"' <<<"$cilium_broker"
@@ -70,8 +115,6 @@ if rg -q 'matchName: management.azure.com|matchName: api.loganalytics.io' <<<"$c
   echo 'Kubernetes-only broker unexpectedly enables Azure network destinations' >&2
   exit 1
 fi
-
-
 rg -q -- '--broker-sandbox-service-account=fixture-sandbox' <<<"$broker"
 rg -q -- '--sandbox-service-account=fixture-sandbox' <<<"$broker"
 rg -q '^automountServiceAccountToken: false$' <<<"$broker"

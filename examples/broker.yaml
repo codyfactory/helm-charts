@@ -1,16 +1,7 @@
 accessBroker:
   enabled: true
-  tlsSecret: broker-server-tls
-  feedTLSSecret: broker-feed-tls
-  caSecret: broker-ca
+  transport:
+    mode: mesh
   networkPolicy:
     provider: external
     externalEnforcementConfigured: true
-  identities:
-    - agentUID: example-agent-uid
-      agentNamespace: default
-      agentName: sre
-      identity:
-        Namespace: default
-        Name: sre-reader
-        UID: example-service-account-uid

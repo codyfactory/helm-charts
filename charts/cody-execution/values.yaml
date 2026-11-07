@@ -50,7 +50,11 @@ accessBroker:
   caSecret: ""
   audience: cody-access-broker
   identityFreshness: 5s
-  identities: []
+  transport:
+    mode: tls
+    sandboxToBroker: {}
+    brokerToFeed: {}
+  issuerRef: {}
   networkPolicy:
     provider: ""
     externalEnforcementConfigured: false

@@ -68,6 +68,11 @@ spec:
                 - rule: "has(self.codex) != has(self.claude)"
                   message: Select exactly one codex or claude harness block
               properties:
+                accessProfileRef:
+                  type: object
+                  required: [name]
+                  properties:
+                    name: {type: string, minLength: 1, maxLength: 253}
                 image:
                   type: string
                   maxLength: 512

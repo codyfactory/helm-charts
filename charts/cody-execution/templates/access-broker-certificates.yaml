@@ -1,0 +1,28 @@
+{{- if and .Values.accessBroker.enabled .Values.accessBroker.issuerRef.name -}}
+{{- $brokerTransport := include "cody.brokerTransport" . -}}
+{{- $feedTransport := include "cody.feedTransport" . -}}
+{{- range $leg := list "broker" "feed" -}}
+{{- if or (and (eq $leg "broker") (eq $brokerTransport "tls")) (and (eq $leg "feed") (eq $feedTransport "tls")) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $.Release.Name }}-broker-{{ $leg }}
+spec:
+  secretName: {{ ternary (include "cody.brokerTLSSecret" $) (include "cody.feedTLSSecret" $) (eq $leg "broker") }}
+  issuerRef:
+    name: {{ $.Values.accessBroker.issuerRef.name | quote }}
+    kind: {{ default "ClusterIssuer" $.Values.accessBroker.issuerRef.kind | quote }}
+    group: {{ default "cert-manager.io" $.Values.accessBroker.issuerRef.group | quote }}
+  dnsNames:
+    {{- if eq $leg "feed" }}
+    - {{ printf "%s-broker-feed.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
+    {{- else }}
+    - {{ printf "%s-broker-kubernetes.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
+    {{- if $.Values.accessBroker.azure.enabled }}
+    - {{ printf "%s-broker-azure.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

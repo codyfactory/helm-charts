@@ -9,6 +9,14 @@ rules:
   - apiGroups: [execution.cody.so]
     resources: [agents, workflows]
     verbs: [get, list, watch]
+  {{- if .Values.accessBroker.enabled }}
+  - apiGroups: [execution.cody.so]
+    resources: [accessprofiles]
+    verbs: [get]
+  - apiGroups: [execution.cody.so]
+    resources: [accessprofiles/status]
+    verbs: [update]
+  {{- end }}
   - apiGroups: [execution.cody.so]
     resources: [agents/status]
     verbs: [update]

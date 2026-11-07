@@ -117,14 +117,71 @@ After merge, checkout/pull main and create the immutable `cody-execution-<versio
 
 Only chart sources, generic CRDs, packages/index and public docs belong here. No credentials, kubeconfigs, private values, company tooling or application source.
 
-### Access broker (implementation contract)
+### Access broker
 
-`accessBroker.enabled` deploys the portable Kubernetes proxy; `accessBroker.azure.enabled` independently opts into the Azure issuer and defaults to false. Both default off until the matching execution image supports the broker contract. `examples/broker.yaml` illustrates a Kubernetes-only installation with explicit Agent and service-account UIDs. Those values are placeholders, not an approved identity mapping. The same mapping generates the broker config and namespace-scoped RBAC. The execution controller requires `create tokenreviews` to authenticate the separate broker feed. Each enabled broker also requires `create tokenreviews` to authenticate sandbox projections. The controller receives neither impersonation nor service-account TokenRequest rights.
+`accessBroker.enabled` deploys the portable Kubernetes proxy; `accessBroker.azure.enabled` independently opts into the Azure issuer and defaults to false. Use matching execution, runtime and chart revisions. On upgrades, apply the updated CRDs from `charts/cody-execution/crds/` before updating Agents or creating AccessProfiles; Helm does not upgrade existing CRDs from the chart’s `crds/` directory. The brokers default to two replicas per enabled component. Merge does not deploy or grant access.
 
-Provision `tlsSecret` with a certificate valid for both enabled broker Service names, `feedTLSSecret` for the broker-feed Service, and `caSecret` with `ca.crt` trusting those certificates. The chart does not generate credentials. A dedicated `<release>-sandbox` service account has automatic token mounting disabled and no RBAC grants. The execution controller projects a Pod-bound token with audience `cody-sandbox-access` and requested lifetime 600 seconds into the trusted runtime, outside the harness identity. Broker-feed tokens keep the separate configured audience (`cody-access-broker` by default). Each broker request performs TokenReview with the exact audience, allowed sandbox service-account username and leased Pod UID. The runtime adds this credential to fixed broker requests over server-authenticated TLS; the harness receives only the turn token and loopback endpoints. Existing authoritative Pod/service-account reads and watches remain required. No client-signing CA or per-Pod identity Secret is used.
+Each Agent may reference one namespaced `AccessProfile`. Platform administrators manage the profile, Agent reference and all selected-identity grants through GitOps. Cody resolves object UIDs internally; Helm no longer accepts `accessBroker.identities`. A profile and its selected ServiceAccount must be in the Agent's namespace. A ServiceAccount can receive resource RoleBindings in other namespaces without a cross-namespace profile reference.
 
-Select `accessBroker.networkPolicy.provider=cilium` with `networkPolicy.enabled=true` for chart-owned Cilium rules. For another CNI, `provider=external` requires `externalEnforcementConfigured=true`: the installation owner must first provide equivalent sandbox egress denial, DNS/resource allowlisting, source preservation or cryptographic binding, and broker-feed isolation. This declaration is an installation prerequisite, not evidence that the CNI enforces it. Do not enable the broker or claim support until the installation's denial and replay tests pass. The chart's standard NetworkPolicy restricts feed ingress to broker-labeled pods; existing policies must not grant additional access because Kubernetes policy rules are additive.
+```yaml
+apiVersion: execution.cody.so/v1alpha1
+kind: AccessProfile
+metadata:
+  name: sre-reader
+  namespace: default
+spec:
+  kubernetes:
+    serviceAccountRef:
+      name: sre-reader
+  # Optional; enable accessBroker.azure.enabled separately:
+  # azure:
+  #   tenantID: "<tenant-id>"
+  #   clientID: "<client-id>"
+  #   allowedResources: [https://management.azure.com]
+```
 
-Broker pods specify no fixed UID or fsGroup and use non-root, restricted capabilities and read-only filesystems for OpenShift compatibility. This does not validate the rest of the execution installation on OpenShift. kind/AKS, EKS and OpenShift acceptance evidence remains separate; these templates do not claim deployed compatibility. Azure federation is optional and is not an AKS requirement. Disabling/removing a broker component does not release its outstanding lease fences: the execution plane waits for acknowledgement or lease expiry plus skew even after the Pod object is deleted.
+Add `accessProfileRef: {name: sre-reader}` to the existing Agent's `spec`. Profile readiness reports whether configuration and the selected ServiceAccount resolve; it does not prove Azure federation or resource permissions. Access-affecting profile changes revoke frozen access according to the execution controller's observation/renewal behavior; metadata changes do not switch the identity of an active turn. Previously issued Azure tokens retain their provider expiry.
 
-The Kubernetes broker accepts only GET/HEAD requests in this slice and denies Secret reads in the sandbox namespace (including cluster-wide Secret enumeration). These restrictions prevent an Agent from retrieving runtime keys directly or by creating a workload to mount them; write approval remains outside this slice. TokenReview is performed for every request without caching; API-server availability and load are part of the deployment requirements.
+[`examples/access-profile.yaml`](examples/access-profile.yaml) includes the profile and explicit scoped RBAC for release `cody` in namespace `default`: selected ServiceAccount resource reads, controller ServiceAccount lookup, and Kubernetes broker observation/impersonation. [`examples/access-profile-azure-rbac.yaml`](examples/access-profile-azure-rbac.yaml) adds the optional Azure issuer's named ServiceAccount TokenRequest grant. Change release/namespace names together before applying. Azure federation and Azure resource roles must be configured separately. The chart never generates selected-ServiceAccount impersonation, TokenRequest or workload resource grants. It supplies only the runtime's system permissions, including TokenReview, Pod observation and controller profile reads/status updates. An Agent reference alone cannot grant additional Kubernetes permissions.
+
+#### Transport
+
+Choose a transport explicitly when opting out of application TLS:
+
+```yaml
+accessBroker:
+  enabled: true
+  transport:
+    mode: mesh  # tls (default), mesh, or plaintext
+  networkPolicy:
+    provider: external
+    externalEnforcementConfigured: true
+```
+
+`mesh` and `plaintext` serve HTTP without Cody certificate Secrets. Mesh mode is a declaration that the installation owner supplies proxy injection, mutual TLS and peer policy; the chart does not install or verify a mesh. Plaintext is an explicit opt-out from transport encryption, so credentials are exposed to any party able to intercept the network path. Authentication, Pod binding and lease fencing remain enabled in all modes. Missing TLS credentials never cause automatic downgrade.
+
+For company-provided TLS:
+
+```yaml
+accessBroker:
+  enabled: true
+  transport:
+    mode: tls
+  tlsSecret: broker-server-tls
+  feedTLSSecret: broker-feed-tls
+  caSecret: broker-ca # Optional; omit only when server certificates chain to system roots
+```
+
+Provide `tlsSecret` with `tls.crt`/`tls.key` valid for `<release>-broker-kubernetes.<namespace>.svc.cluster.local` and, if enabled, `<release>-broker-azure.<namespace>.svc.cluster.local`. `feedTLSSecret` covers `<release>-broker-feed.<namespace>.svc.cluster.local`. The optional CA Secret contains `ca.crt` trusting both servers. Per-leg overrides are available under `accessBroker.transport.sandboxToBroker.mode` and `.brokerToFeed.mode`. Configure certificates only for TLS legs.
+
+Alternatively, if cert-manager is already installed, set `accessBroker.issuerRef: {name: platform-internal, kind: ClusterIssuer}` instead of `tlsSecret` and `feedTLSSecret`. The chart creates Certificates for the enabled TLS legs. The issuer must support the internal Service DNS names. A private issuer still requires the trusted `caSecret`; the chart does not infer CA trust from an issuer. Do not configure managed and existing TLS Secrets together. Roll the corresponding broker/controller workloads after certificate renewal so the listeners load the new key pair.
+
+#### Sandbox and network setup
+
+The chart creates a dedicated `<release>-sandbox` ServiceAccount with automatic token mounting disabled and no RBAC grants. The controller projects a Pod-bound token with audience `cody-sandbox-access` and requested lifetime 600 seconds into the trusted runtime, outside the harness identity. Broker-feed tokens use the separate configured audience (`cody-access-broker` by default). Every broker request performs TokenReview for the exact audience, allowed sandbox ServiceAccount and leased Pod UID. The runtime supplies kubeconfig and optional Azure CLI environment automatically. No client-signing CA, per-Pod identity Secret, manually entered UIDs or privileged sandbox ServiceAccount is required.
+
+Select `accessBroker.networkPolicy.provider=cilium` with `networkPolicy.enabled=true` for chart-owned Cilium rules. For another CNI, `provider=external` requires `externalEnforcementConfigured=true`: the installation owner must first provide equivalent sandbox egress denial, DNS/resource allowlisting and broker-feed isolation. This declaration is a prerequisite, not evidence that the CNI enforces it. Existing NetworkPolicies must not grant bypass access because Kubernetes policy rules are additive. Apply the same checks when using a mesh.
+
+The Kubernetes broker accepts only GET/HEAD requests and denies Secret reads in the sandbox namespace, including cluster-wide Secret enumeration. Write approval remains outside this slice. Authoritative Pod/ServiceAccount watches and periodic reads remain required. A feed interruption retains cached lease authorization only until its execution deadline; identity failures still deny access, and successors remain fenced until acknowledgement or expiry plus skew. Disabling or deleting a broker Deployment does not remove its outstanding fencing obligations.
+
+Broker pods use non-root, restricted capabilities and read-only filesystems without fixed UID/fsGroup. This does not validate the whole installation on OpenShift: sandbox runtime requirements and CNI behavior still need acceptance. Projected-token deployment, mesh enforcement and plaintext deployment acceptance remain unverified. Use a controlled Agent turn to test allowed reads, denied operations, identity changes, lease expiry and feed outages before enabling shared workloads.

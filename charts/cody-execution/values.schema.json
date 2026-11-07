@@ -342,74 +342,6 @@
         "identityFreshness": {
           "type": "string"
         },
-        "identities": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "agentUID",
-              "agentNamespace",
-              "agentName",
-              "identity"
-            ],
-            "properties": {
-              "agentUID": {
-                "type": "string",
-                "minLength": 1
-              },
-              "agentNamespace": {
-                "type": "string",
-                "minLength": 1
-              },
-              "agentName": {
-                "type": "string",
-                "minLength": 1
-              },
-              "identity": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "Namespace",
-                  "Name",
-                  "UID"
-                ],
-                "properties": {
-                  "Namespace": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "Name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "UID": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "AzureClientID": {
-                    "type": "string"
-                  },
-                  "AzureTenantID": {
-                    "type": "string"
-                  },
-                  "AzureObjectID": {
-                    "type": "string"
-                  },
-                  "AzureResourceID": {
-                    "type": "string"
-                  },
-                  "Audiences": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
         "networkPolicy": {
           "type": "object",
           "additionalProperties": false,
@@ -433,6 +365,76 @@
             "enabled": {
               "type": "boolean"
             }
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "tls",
+                "mesh",
+                "plaintext"
+              ]
+            },
+            "sandboxToBroker": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "tls",
+                    "mesh",
+                    "plaintext"
+                  ]
+                }
+              }
+            },
+            "brokerToFeed": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "tls",
+                    "mesh",
+                    "plaintext"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "issuerRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
+            },
+            "group": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "dependencies": {
+            "kind": [
+              "name"
+            ],
+            "group": [
+              "name"
+            ]
           }
         }
       }

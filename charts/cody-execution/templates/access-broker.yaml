@@ -3,9 +3,17 @@
 {{- fail "accessBroker.azure.enabled requires accessBroker.enabled" -}}
 {{- end -}}
 {{- if $broker.enabled -}}
-{{- $tls := required "accessBroker.tlsSecret is required" $broker.tlsSecret -}}
-{{- $feedTLS := required "accessBroker.feedTLSSecret is required" $broker.feedTLSSecret -}}
-{{- $ca := required "accessBroker.caSecret is required" $broker.caSecret -}}
+{{- $transport := include "cody.brokerTransport" . -}}
+{{- $feedTransport := include "cody.feedTransport" . -}}
+{{- $tls := include "cody.brokerTLSSecret" . -}}
+{{- $feedTLS := include "cody.feedTLSSecret" . -}}
+{{- if eq $transport "tls" -}}{{- $_ := required "accessBroker.tlsSecret or issuerRef is required for TLS" $tls -}}{{- else if $broker.tlsSecret -}}{{- fail "accessBroker.tlsSecret requires sandboxToBroker TLS" -}}{{- end -}}
+{{- if eq $feedTransport "tls" -}}{{- $_ := required "accessBroker.feedTLSSecret or issuerRef is required for TLS" $feedTLS -}}{{- else if $broker.feedTLSSecret -}}{{- fail "accessBroker.feedTLSSecret requires brokerToFeed TLS" -}}{{- end -}}
+{{- if and (ne $transport "tls") (ne $feedTransport "tls") (or $broker.caSecret $broker.issuerRef.name) -}}{{- fail "CA and issuer configuration require a TLS transport" -}}{{- end -}}
+{{- if and $broker.issuerRef.name (or $broker.tlsSecret $broker.feedTLSSecret) -}}{{- fail "Use issuerRef or existing TLS Secrets, not both" -}}{{- end -}}
+{{- $scheme := ternary "https" "http" (eq $transport "tls") -}}
+{{- $feedScheme := ternary "https" "http" (eq $feedTransport "tls") -}}
+{{- $ca := $broker.caSecret -}}
 {{- if lt (int $broker.replicas) 2 -}}{{- fail "accessBroker.replicas must be at least 2" -}}{{- end -}}
 {{- if not (or (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
 {{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
@@ -56,10 +64,16 @@ spec:
             - --sandbox-service-account={{ $.Release.Name }}-sandbox
             - --sandbox-namespace={{ $.Release.Namespace }}
             - --listen=:8443
+            - --transport-mode={{ $transport }}
+            - --feed-transport-mode={{ $feedTransport }}
+            {{- if eq $transport "tls" }}
             - --tls-cert=/etc/cody/broker-tls/tls.crt
             - --tls-key=/etc/cody/broker-tls/tls.key
-            - --feed-url=https://{{ $.Release.Name }}-broker-feed.{{ $.Release.Namespace }}.svc.cluster.local:8444
+            {{- end }}
+            - --feed-url={{ $feedScheme }}://{{ $.Release.Name }}-broker-feed.{{ $.Release.Namespace }}.svc.cluster.local:8444
+            {{- if and (eq $feedTransport "tls") $ca }}
             - --feed-ca=/etc/cody/feed-ca/ca.crt
+            {{- end }}
             - --feed-token-file=/var/run/secrets/cody-broker/token
             - --identity-freshness={{ $broker.identityFreshness }}
           env:
@@ -85,22 +99,30 @@ spec:
               path: /healthz
               port: 8081
           volumeMounts:
+            {{- if eq $transport "tls" }}
             - name: tls
               mountPath: /etc/cody/broker-tls
               readOnly: true
+            {{- end }}
+            {{- if and (eq $feedTransport "tls") $ca }}
             - name: ca
               mountPath: /etc/cody/feed-ca
               readOnly: true
+            {{- end }}
             - name: feed-token
               mountPath: /var/run/secrets/cody-broker
               readOnly: true
       volumes:
+        {{- if eq $transport "tls" }}
         - name: tls
           secret:
             secretName: {{ $tls | quote }}
+        {{- end }}
+        {{- if and (eq $feedTransport "tls") $ca }}
         - name: ca
           secret:
             secretName: {{ $ca | quote }}
+        {{- end }}
         - name: feed-token
           projected:
             sources:
@@ -118,7 +140,7 @@ spec:
   selector:
     app: {{ $.Release.Name }}-broker-{{ $mode }}
   ports:
-    - port: 443
+    - port: {{ ternary 443 80 (eq $transport "tls") }}
       targetPort: 8443
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -142,41 +164,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ $.Release.Name }}-broker-{{ $mode }}-pods
-{{- range $index, $identity := $broker.identities }}
-{{- if or (eq $mode "kubernetes") $identity.identity.AzureClientID }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ $.Release.Name }}-broker-{{ $mode }}-{{ $index }}
-  namespace: {{ required "Broker identity namespace is required" $identity.identity.Namespace }}
-rules:
-  - apiGroups: [""]
-    resources: [serviceaccounts]
-    resourceNames: [{{ required "Broker identity serviceAccount is required" $identity.identity.Name | quote }}]
-    verbs: [get, watch{{ if eq $mode "kubernetes" }}, impersonate{{ end }}]
-  {{- if eq $mode "azure" }}
-  - apiGroups: [""]
-    resources: [serviceaccounts/token]
-    resourceNames: [{{ $identity.identity.Name | quote }}]
-    verbs: [create]
-  {{- end }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ $.Release.Name }}-broker-{{ $mode }}-{{ $index }}
-  namespace: {{ $identity.identity.Namespace }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ $.Release.Name }}-broker-{{ $mode }}
-    namespace: {{ $.Release.Namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ $.Release.Name }}-broker-{{ $mode }}-{{ $index }}
-{{- end }}
-{{- end }}
 {{- end }}
 ---
 apiVersion: v1
@@ -212,6 +199,8 @@ spec:
 {{- end }}
 
 {{- if .Values.accessBroker.enabled }}
+{{- $transport := include "cody.brokerTransport" . -}}
+{{- $scheme := ternary "https" "http" (eq $transport "tls") -}}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -220,8 +209,10 @@ metadata:
 data:
   config.json: |
     {{- $azureEndpoint := "" -}}
-    {{- if .Values.accessBroker.azure.enabled -}}{{- $azureEndpoint = printf "https://%s-broker-azure.%s.svc.cluster.local/msi/token" .Release.Name .Release.Namespace -}}{{- end }}
-    {{ dict "kubernetesEndpoint" (printf "https://%s-broker-kubernetes.%s.svc.cluster.local" .Release.Name .Release.Namespace) "azureEndpoint" $azureEndpoint "caFile" "/broker-ca/ca.crt" "identities" .Values.accessBroker.identities | toJson }}
+    {{- if .Values.accessBroker.azure.enabled -}}{{- $azureEndpoint = printf "%s://%s-broker-azure.%s.svc.cluster.local/msi/token" $scheme .Release.Name .Release.Namespace -}}{{- end }}
+    {{- $caFile := "" -}}
+    {{- if and (eq $transport "tls") .Values.accessBroker.caSecret -}}{{- $caFile = "/broker-ca/ca.crt" -}}{{- end }}
+    {{ dict "kubernetesEndpoint" (printf "%s://%s-broker-kubernetes.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace) "azureEndpoint" $azureEndpoint "caFile" $caFile "transportMode" $transport | toJson }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
