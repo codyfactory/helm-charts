@@ -17,3 +17,24 @@
 {{- printf "%s-runtime-auth" .Release.Name -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "cody.brokerTransport" -}}
+{{- default .Values.accessBroker.transport.mode .Values.accessBroker.transport.sandboxToBroker.mode -}}
+{{- end -}}
+{{- define "cody.feedTransport" -}}
+{{- default .Values.accessBroker.transport.mode .Values.accessBroker.transport.brokerToFeed.mode -}}
+{{- end -}}
+{{- define "cody.brokerTLSSecret" -}}
+{{- if .Values.accessBroker.issuerRef.name -}}
+{{- printf "%s-broker-tls" .Release.Name -}}
+{{- else -}}
+{{- .Values.accessBroker.tlsSecret -}}
+{{- end -}}
+{{- end -}}
+{{- define "cody.feedTLSSecret" -}}
+{{- if .Values.accessBroker.issuerRef.name -}}
+{{- printf "%s-broker-feed-tls" .Release.Name -}}
+{{- else -}}
+{{- .Values.accessBroker.feedTLSSecret -}}
+{{- end -}}
+{{- end -}}

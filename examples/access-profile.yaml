@@ -1,0 +1,68 @@
+# GitOps example for release "cody" in namespace "default".
+# Change these names together. These grants are admin-owned, not created by Cody.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-reader
+  namespace: default
+automountServiceAccountToken: false
+---
+apiVersion: execution.cody.so/v1alpha1
+kind: AccessProfile
+metadata:
+  name: sre-reader
+  namespace: default
+spec:
+  kubernetes:
+    serviceAccountRef:
+      name: sre-reader
+# Add accessProfileRef: {name: sre-reader} to an existing Agent's spec in this namespace.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-resource-reader
+  namespace: default
+rules:
+  - apiGroups: ['']
+    resources: [pods, pods/log, events]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-resource-reader
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: sre-reader
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sre-resource-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-kubernetes-broker
+  namespace: default
+rules:
+  - apiGroups: ['']
+    resources: [serviceaccounts]
+    resourceNames: [sre-reader]
+    verbs: [impersonate]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-kubernetes-broker
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: cody-broker-kubernetes
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sre-kubernetes-broker

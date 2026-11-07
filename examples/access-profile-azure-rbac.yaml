@@ -1,0 +1,28 @@
+# Optional admin-owned addition to access-profile.yaml when Azure issuance is enabled.
+# Configure federation for system:serviceaccount:default:sre-reader in Azure separately.
+# Add azure: {tenantID: ..., clientID: ..., allowedResources: [https://management.core.windows.net/, https://management.azure.com]}
+# to AccessProfile.spec. Azure resource roles are also managed outside Cody.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-azure-broker
+  namespace: default
+rules:
+  - apiGroups: ['']
+    resources: [serviceaccounts/token]
+    resourceNames: [sre-reader]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-azure-broker
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: cody-broker-azure
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sre-azure-broker

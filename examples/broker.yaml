@@ -1,0 +1,7 @@
+accessBroker:
+  enabled: true
+  transport:
+    mode: mesh
+  networkPolicy:
+    provider: external
+    externalEnforcementConfigured: true

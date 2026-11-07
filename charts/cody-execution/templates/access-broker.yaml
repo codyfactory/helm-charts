@@ -1,0 +1,249 @@
+{{- $broker := .Values.accessBroker -}}
+{{- if and $broker.azure.enabled (not $broker.enabled) -}}
+{{- fail "accessBroker.azure.enabled requires accessBroker.enabled" -}}
+{{- end -}}
+{{- if $broker.enabled -}}
+{{- $transport := include "cody.brokerTransport" . -}}
+{{- $feedTransport := include "cody.feedTransport" . -}}
+{{- $tls := include "cody.brokerTLSSecret" . -}}
+{{- $feedTLS := include "cody.feedTLSSecret" . -}}
+{{- if eq $transport "tls" -}}{{- $_ := required "accessBroker.tlsSecret or issuerRef is required for TLS" $tls -}}{{- else if $broker.tlsSecret -}}{{- fail "accessBroker.tlsSecret requires sandboxToBroker TLS" -}}{{- end -}}
+{{- if eq $feedTransport "tls" -}}{{- $_ := required "accessBroker.feedTLSSecret or issuerRef is required for TLS" $feedTLS -}}{{- else if $broker.feedTLSSecret -}}{{- fail "accessBroker.feedTLSSecret requires brokerToFeed TLS" -}}{{- end -}}
+{{- if and (ne $transport "tls") (ne $feedTransport "tls") (or $broker.caSecret $broker.issuerRef.name) -}}{{- fail "CA and issuer configuration require a TLS transport" -}}{{- end -}}
+{{- if and $broker.issuerRef.name (or $broker.tlsSecret $broker.feedTLSSecret) -}}{{- fail "Use issuerRef or existing TLS Secrets, not both" -}}{{- end -}}
+{{- if $broker.issuerRef.name -}}{{- $_ := required "accessBroker.caSecret is required with issuerRef" $broker.caSecret -}}{{- end -}}
+{{- $scheme := ternary "https" "http" (eq $transport "tls") -}}
+{{- $feedScheme := ternary "https" "http" (eq $feedTransport "tls") -}}
+{{- $ca := $broker.caSecret -}}
+{{- if lt (int $broker.replicas) 2 -}}{{- fail "accessBroker.replicas must be at least 2" -}}{{- end -}}
+{{- if not (or (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
+{{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
+{{- end -}}
+{{- $modes := list "kubernetes" -}}
+{{- if $broker.azure.enabled -}}{{- $modes = append $modes "azure" -}}{{- end -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-sandbox
+automountServiceAccountToken: false
+{{- range $mode := $modes }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $.Release.Name }}-broker-{{ $mode }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-broker-{{ $mode }}
+spec:
+  replicas: {{ $broker.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-broker-{{ $mode }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-broker-{{ $mode }}
+        cody.so/broker: {{ $.Release.Name | quote }}
+    spec:
+      serviceAccountName: {{ $.Release.Name }}-broker-{{ $mode }}
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: broker
+          image: {{ $.Values.image | quote }}
+          command: [/cody-execution]
+          args:
+            - broker
+            - --mode={{ $mode }}
+            - --kube-api-qps={{ $.Values.kubernetes.qps }}
+            - --kube-api-burst={{ $.Values.kubernetes.burst }}
+            - --sandbox-service-account={{ $.Release.Name }}-sandbox
+            - --sandbox-namespace={{ $.Release.Namespace }}
+            - --listen=:8443
+            - --transport-mode={{ $transport }}
+            - --feed-transport-mode={{ $feedTransport }}
+            {{- if eq $transport "tls" }}
+            - --tls-cert=/etc/cody/broker-tls/tls.crt
+            - --tls-key=/etc/cody/broker-tls/tls.key
+            {{- end }}
+            - --feed-url={{ $feedScheme }}://{{ $.Release.Name }}-broker-feed.{{ $.Release.Namespace }}.svc.cluster.local:8444
+            {{- if and (eq $feedTransport "tls") $ca }}
+            - --feed-ca=/etc/cody/feed-ca/ca.crt
+            {{- end }}
+            - --feed-token-file=/var/run/secrets/cody-broker/token
+            - --identity-freshness={{ $broker.identityFreshness }}
+          env:
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+          volumeMounts:
+            {{- if eq $transport "tls" }}
+            - name: tls
+              mountPath: /etc/cody/broker-tls
+              readOnly: true
+            {{- end }}
+            {{- if and (eq $feedTransport "tls") $ca }}
+            - name: ca
+              mountPath: /etc/cody/feed-ca
+              readOnly: true
+            {{- end }}
+            - name: feed-token
+              mountPath: /var/run/secrets/cody-broker
+              readOnly: true
+      volumes:
+        {{- if eq $transport "tls" }}
+        - name: tls
+          secret:
+            secretName: {{ $tls | quote }}
+        {{- end }}
+        {{- if and (eq $feedTransport "tls") $ca }}
+        - name: ca
+          secret:
+            secretName: {{ $ca | quote }}
+        {{- end }}
+        - name: feed-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ $broker.audience | quote }}
+                  expirationSeconds: 600
+                  path: token
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-broker-{{ $mode }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ $.Release.Name }}-broker-{{ $mode }}
+  ports:
+    - port: {{ ternary 443 80 (eq $transport "tls") }}
+      targetPort: 8443
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $.Release.Name }}-broker-{{ $mode }}-pods
+rules:
+  - apiGroups: [""]
+    resources: [pods, serviceaccounts]
+    verbs: [get, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $.Release.Name }}-broker-{{ $mode }}-pods
+subjects:
+  - kind: ServiceAccount
+    name: {{ $.Release.Name }}-broker-{{ $mode }}
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $.Release.Name }}-broker-{{ $mode }}-pods
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-broker-feed
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Release.Name }}-execution-plane
+  ports:
+    - port: 8444
+      targetPort: 8444
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-broker-feed
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-execution-plane
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8080
+    - from:
+        - podSelector:
+            matchLabels:
+              cody.so/broker: {{ .Release.Name | quote }}
+      ports:
+        - port: 8444
+{{- end }}
+
+{{- if .Values.accessBroker.enabled }}
+{{- $transport := include "cody.brokerTransport" . -}}
+{{- $scheme := ternary "https" "http" (eq $transport "tls") -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-broker-config
+data:
+  config.json: |
+    {{- $azureEndpoint := "" -}}
+    {{- if .Values.accessBroker.azure.enabled -}}{{- $azureEndpoint = printf "%s://%s-broker-azure.%s.svc.cluster.local/msi/token" $scheme .Release.Name .Release.Namespace -}}{{- end }}
+    {{- $caFile := "" -}}
+    {{- if and (eq $transport "tls") .Values.accessBroker.caSecret -}}{{- $caFile = "/broker-ca/ca.crt" -}}{{- end }}
+    {{ dict "kubernetesEndpoint" (printf "%s://%s-broker-kubernetes.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace) "azureEndpoint" $azureEndpoint "caFile" $caFile "transportMode" $transport | toJson }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-broker-tokenreview
+rules:
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-broker-tokenreview
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-execution-plane
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-broker-kubernetes
+    namespace: {{ .Release.Namespace }}
+  {{- if .Values.accessBroker.azure.enabled }}
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-broker-azure
+    namespace: {{ .Release.Namespace }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-broker-tokenreview
+{{- end }}

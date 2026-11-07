@@ -44,3 +44,122 @@ if helm template fixture "$chart" -f "$values" --set assetAccess.azure.clientID=
   echo 'Incomplete Azure identity unexpectedly accepted' >&2
   exit 1
 fi
+
+broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --include-crds)"
+rg -q 'name: fixture-broker-kubernetes' <<<"$broker"
+rg -q -- '--broker-listen=:8444' <<<"$broker"
+rg -q -- '--transport-mode=mesh' <<<"$broker"
+rg -q -- '--feed-transport-mode=mesh' <<<"$broker"
+rg -q -- '--broker-feed-transport-mode=mesh' <<<"$broker"
+rg -q -- '--feed-url=http://fixture-broker-feed.default.svc.cluster.local:8444' <<<"$broker"
+rg -q '"transportMode":"mesh"' <<<"$broker"
+rg -q 'name: accessprofiles.execution.cody.so' <<<"$broker"
+rg -q 'accessProfileRef:' <<<"$broker"
+rg -q 'resources: \[accessprofiles/status\]' <<<"$broker"
+rg -q 'resources: \[tokenreviews\]' <<<"$broker"
+if rg -q 'fixture-broker-azure|serviceaccounts/token|impersonate|IDENTITY_ENDPOINT|api://AzureADTokenExchange|--tls-cert|--broker-tls-cert|--feed-ca|"identities"' <<<"$broker"; then
+  echo 'Kubernetes-only mesh broker rendered privileged identity grants, TLS, or Azure access' >&2
+  exit 1
+fi
+azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true)"
+rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
+controller_rbac="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --show-only templates/rbac.yaml)"
+rg -U -q 'resources: \[serviceaccounts\]\n    verbs: \[get\]' <<<"$controller_rbac"
+test "$(rg -c 'resources: \[pods, serviceaccounts\]' <<<"$azure_broker")" = 2
+rg -U -q 'resources: \[pods, serviceaccounts\]\n    verbs: \[get, watch\]' <<<"$azure_broker"
+if rg -q 'resourceNames:' <<<"$controller_rbac"; then
+  echo 'Controller ServiceAccount metadata lookup unexpectedly requires per-profile grants' >&2
+  exit 1
+fi
+rg -U -q 'resources: \[serviceaccounts\]\n    resourceNames: \[sre-reader\]\n    verbs: \[impersonate\]' examples/access-profile.yaml
+rg -U -q 'resources: \[serviceaccounts/token\]\n    resourceNames: \[sre-reader\]\n    verbs: \[create\]' examples/access-profile-azure-rbac.yaml
+if rg -q 'sre-profile-resolver|verbs: \[get, watch\]' examples/access-profile.yaml examples/access-profile-azure-rbac.yaml; then
+  echo 'Profile examples unexpectedly require metadata observation grants' >&2
+  exit 1
+fi
+test "$(rg -c -- '--kube-api-qps=20' <<<"$azure_broker")" = 2
+test "$(rg -c -- '--kube-api-burst=40' <<<"$azure_broker")" = 2
+broker_limits="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true,kubernetes.burst=25 --set-json kubernetes.qps=12.5)"
+test "$(rg -c -- '--kube-api-qps=12.5' <<<"$broker_limits")" = 2
+test "$(rg -c -- '--kube-api-burst=25' <<<"$broker_limits")" = 2
+if rg -q 'serviceaccounts/token|impersonate' <<<"$azure_broker"; then
+  echo 'Chart must not create admin-owned selected-identity grants' >&2
+  exit 1
+fi
+for invalid in 'accessBroker.replicas=1' 'accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.enabled=false,accessBroker.azure.enabled=true' 'accessBroker.transport.mode=invalid' 'accessBroker.tlsSecret=unexpected' 'accessBroker.caSecret=unexpected' 'accessBroker.transport.mode=tls' 'accessBroker.identities[0].agentUID=retired'; do
+  if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid broker configuration unexpectedly rendered: $invalid" >&2
+    exit 1
+  fi
+done
+plaintext="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=plaintext)"
+rg -q -- '--transport-mode=plaintext' <<<"$plaintext"
+rg -q -- '--broker-feed-transport-mode=plaintext' <<<"$plaintext"
+tls="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls,accessBroker.caSecret=trust)"
+rg -q -- '--tls-cert=/etc/cody/broker-tls/tls.crt' <<<"$tls"
+rg -q -- '--broker-tls-cert=/broker-feed-tls/tls.crt' <<<"$tls"
+rg -q -- '--feed-url=https://fixture-broker-feed.default.svc.cluster.local:8444' <<<"$tls"
+rg -q 'secretName: "trust"' <<<"$tls"
+for invalid in 'accessBroker.tlsSecret=' 'accessBroker.feedTLSSecret='; do
+  if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls --set "$invalid" >/dev/null 2>&1; then
+    echo "Incomplete TLS configuration unexpectedly rendered: $invalid" >&2
+    exit 1
+  fi
+done
+system_roots="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.tlsSecret=server-tls,accessBroker.feedTLSSecret=feed-tls)"
+if rg -q -- '--feed-ca|mountPath: /broker-ca' <<<"$system_roots"; then
+  echo 'System-root TLS unexpectedly mounts an empty custom CA' >&2
+  exit 1
+fi
+mixed="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.brokerToFeed.mode=tls,accessBroker.feedTLSSecret=feed-tls,accessBroker.caSecret=trust)"
+rg -q -- '--transport-mode=mesh' <<<"$mixed"
+rg -q -- '--feed-transport-mode=tls' <<<"$mixed"
+rg -q -- '--broker-tls-cert=/broker-feed-tls/tls.crt' <<<"$mixed"
+if rg -q -- '--tls-cert=|mountPath: /broker-ca' <<<"$mixed"; then
+  echo 'HTTP sandbox leg unexpectedly configures TLS' >&2
+  exit 1
+fi
+managed="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.caSecret=trust,accessBroker.azure.enabled=true)"
+test "$(rg -c '^kind: Certificate$' <<<"$managed")" = 2
+rg -q '"caFile":"/broker-ca/ca.crt"' <<<"$managed"
+rg -q -- '--feed-ca=/etc/cody/feed-ca/ca.crt' <<<"$managed"
+if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal >/dev/null 2>&1; then
+  echo 'Managed TLS without a CA Secret unexpectedly rendered' >&2
+  exit 1
+fi
+rg -q 'secretName: fixture-broker-tls' <<<"$managed"
+rg -q 'fixture-broker-azure.default.svc.cluster.local' <<<"$managed"
+if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.caSecret=trust,accessBroker.tlsSecret=ambiguous >/dev/null 2>&1; then
+  echo 'Mixed managed and existing TLS Secrets unexpectedly rendered' >&2
+  exit 1
+fi
+cilium_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set networkPolicy.enabled=true,accessBroker.networkPolicy.provider=cilium)"
+rg -q 'kind: CiliumNetworkPolicy' <<<"$cilium_broker"
+rg -q 'port: "8443"' <<<"$cilium_broker"
+if rg -q 'matchName: management.azure.com|matchName: api.loganalytics.io' <<<"$cilium_broker"; then
+  echo 'Kubernetes-only broker unexpectedly enables Azure network destinations' >&2
+  exit 1
+fi
+rg -q -- '--broker-sandbox-service-account=fixture-sandbox' <<<"$broker"
+rg -q -- '--sandbox-service-account=fixture-sandbox' <<<"$broker"
+rg -q '^automountServiceAccountToken: false$' <<<"$broker"
+if rg -q 'client-ca|client-signer|broker-client-ca|verbs: \[get, create, update, delete\]' <<<"$broker"; then
+  echo 'Retired client-certificate provisioning unexpectedly rendered' >&2
+  exit 1
+fi
+for mode in broker azure_broker; do
+  rendered="${!mode}"
+  binding="$(sed -n '/^kind: ClusterRoleBinding$/,/^---$/p' <<<"$rendered")"
+  rg -q 'name: fixture-execution-plane' <<<"$binding"
+  rg -q 'name: fixture-broker-kubernetes' <<<"$binding"
+  if rg -q 'name: fixture-sandbox' <<<"$binding"; then
+    echo 'Sandbox account unexpectedly receives TokenReview permissions' >&2
+    exit 1
+  fi
+  if [[ "$mode" == azure_broker ]]; then
+    rg -q 'name: fixture-broker-azure' <<<"$binding"
+  elif rg -q 'name: fixture-broker-azure' <<<"$binding"; then
+    echo 'Disabled Azure broker unexpectedly receives TokenReview permissions' >&2
+    exit 1
+  fi
+done

@@ -309,6 +309,135 @@
           "const": "cody/codex-v1"
         }
       }
+    },
+    "accessBroker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "azure",
+        "networkPolicy"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "tlsSecret": {
+          "type": "string"
+        },
+        "feedTLSSecret": {
+          "type": "string"
+        },
+        "caSecret": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identityFreshness": {
+          "type": "string"
+        },
+        "networkPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "",
+                "cilium",
+                "external"
+              ]
+            },
+            "externalEnforcementConfigured": {
+              "type": "boolean"
+            }
+          }
+        },
+        "azure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "tls",
+                "mesh",
+                "plaintext"
+              ]
+            },
+            "sandboxToBroker": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "tls",
+                    "mesh",
+                    "plaintext"
+                  ]
+                }
+              }
+            },
+            "brokerToFeed": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "tls",
+                    "mesh",
+                    "plaintext"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "issuerRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
+            },
+            "group": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "dependencies": {
+            "kind": [
+              "name"
+            ],
+            "group": [
+              "name"
+            ]
+          }
+        }
+      }
     }
   },
   "additionalProperties": false,

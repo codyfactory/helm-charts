@@ -42,3 +42,21 @@ assetAccess:
 
 assetValidation:
   size: 2Gi
+accessBroker:
+  enabled: false
+  replicas: 2
+  tlsSecret: ""
+  feedTLSSecret: ""
+  caSecret: ""
+  audience: cody-access-broker
+  identityFreshness: 5s
+  transport:
+    mode: tls
+    sandboxToBroker: {}
+    brokerToFeed: {}
+  issuerRef: {}
+  networkPolicy:
+    provider: ""
+    externalEnforcementConfigured: false
+  azure:
+    enabled: false

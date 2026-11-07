@@ -28,6 +28,14 @@ spec:
             dns:
               - matchName: api.cody.so
               - matchName: {{ printf "%s-execution-plane.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- if .Values.accessBroker.enabled }}
+              - matchName: {{ printf "%s-broker-kubernetes.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- if .Values.accessBroker.azure.enabled }}
+              - matchName: {{ printf "%s-broker-azure.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              - matchName: management.azure.com
+              - matchName: api.loganalytics.io
+              {{- end }}
+              {{- end }}
               {{- range .Values.networkPolicy.toolDomains }}
               - matchName: {{ . | quote }}
               {{- end }}
@@ -46,6 +54,34 @@ spec:
             - port: "443"
               protocol: TCP
           serverNames: [{{ . | quote }}]
+    {{- end }}
+    {{- if .Values.accessBroker.enabled }}
+    - toEndpoints:
+        - matchLabels:
+            app: {{ .Release.Name }}-broker-kubernetes
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+    {{- if .Values.accessBroker.azure.enabled }}
+    - toEndpoints:
+        - matchLabels:
+            app: {{ .Release.Name }}-broker-azure
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+    - toFQDNs:
+        - matchName: management.azure.com
+        - matchName: api.loganalytics.io
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+          serverNames: [management.azure.com, api.loganalytics.io]
+    {{- end }}
     {{- end }}
     - toEndpoints:
         - matchLabels:
