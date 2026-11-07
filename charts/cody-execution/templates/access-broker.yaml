@@ -11,6 +11,7 @@
 {{- if eq $feedTransport "tls" -}}{{- $_ := required "accessBroker.feedTLSSecret or issuerRef is required for TLS" $feedTLS -}}{{- else if $broker.feedTLSSecret -}}{{- fail "accessBroker.feedTLSSecret requires brokerToFeed TLS" -}}{{- end -}}
 {{- if and (ne $transport "tls") (ne $feedTransport "tls") (or $broker.caSecret $broker.issuerRef.name) -}}{{- fail "CA and issuer configuration require a TLS transport" -}}{{- end -}}
 {{- if and $broker.issuerRef.name (or $broker.tlsSecret $broker.feedTLSSecret) -}}{{- fail "Use issuerRef or existing TLS Secrets, not both" -}}{{- end -}}
+{{- if $broker.issuerRef.name -}}{{- $_ := required "accessBroker.caSecret is required with issuerRef" $broker.caSecret -}}{{- end -}}
 {{- $scheme := ternary "https" "http" (eq $transport "tls") -}}
 {{- $feedScheme := ternary "https" "http" (eq $feedTransport "tls") -}}
 {{- $ca := $broker.caSecret -}}
@@ -151,7 +152,7 @@ metadata:
   name: {{ $.Release.Name }}-broker-{{ $mode }}-pods
 rules:
   - apiGroups: [""]
-    resources: [pods]
+    resources: [pods, serviceaccounts]
     verbs: [get, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

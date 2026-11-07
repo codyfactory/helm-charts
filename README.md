@@ -142,7 +142,7 @@ spec:
 
 Add `accessProfileRef: {name: sre-reader}` to the existing Agent's `spec`. Profile readiness reports whether configuration and the selected ServiceAccount resolve; it does not prove Azure federation or resource permissions. Access-affecting profile changes revoke frozen access according to the execution controller's observation/renewal behavior; metadata changes do not switch the identity of an active turn. Previously issued Azure tokens retain their provider expiry.
 
-[`examples/access-profile.yaml`](examples/access-profile.yaml) includes the profile and explicit scoped RBAC for release `cody` in namespace `default`: selected ServiceAccount resource reads, controller ServiceAccount lookup, and Kubernetes broker observation/impersonation. [`examples/access-profile-azure-rbac.yaml`](examples/access-profile-azure-rbac.yaml) adds the optional Azure issuer's named ServiceAccount TokenRequest grant. Change release/namespace names together before applying. Azure federation and Azure resource roles must be configured separately. The chart never generates selected-ServiceAccount impersonation, TokenRequest or workload resource grants. It supplies only the runtime's system permissions, including TokenReview, Pod observation and controller profile reads/status updates. An Agent reference alone cannot grant additional Kubernetes permissions.
+[`examples/access-profile.yaml`](examples/access-profile.yaml) includes the profile and explicit scoped RBAC for release `cody` in namespace `default`: selected ServiceAccount resource reads and a named Kubernetes broker impersonation grant. [`examples/access-profile-azure-rbac.yaml`](examples/access-profile-azure-rbac.yaml) adds the optional Azure issuer's named ServiceAccount TokenRequest grant. Change release/namespace names together before applying. Azure federation and Azure resource roles must be configured separately. The chart never generates selected-ServiceAccount impersonation, TokenRequest or workload resource grants. It supplies only the runtime's system permissions, including TokenReview, Pod observation, namespace-wide ServiceAccount metadata reads (`get` for the controller, `get`/`watch` for brokers), and controller profile reads/status updates. An Agent reference alone cannot grant additional Kubernetes permissions.
 
 #### Transport
 
@@ -169,12 +169,12 @@ accessBroker:
     mode: tls
   tlsSecret: broker-server-tls
   feedTLSSecret: broker-feed-tls
-  caSecret: broker-ca # Optional; omit only when server certificates chain to system roots
+  caSecret: broker-ca
 ```
 
-Provide `tlsSecret` with `tls.crt`/`tls.key` valid for `<release>-broker-kubernetes.<namespace>.svc.cluster.local` and, if enabled, `<release>-broker-azure.<namespace>.svc.cluster.local`. `feedTLSSecret` covers `<release>-broker-feed.<namespace>.svc.cluster.local`. The optional CA Secret contains `ca.crt` trusting both servers. Per-leg overrides are available under `accessBroker.transport.sandboxToBroker.mode` and `.brokerToFeed.mode`. Configure certificates only for TLS legs.
+Provide `tlsSecret` with `tls.crt`/`tls.key` valid for `<release>-broker-kubernetes.<namespace>.svc.cluster.local` and, if enabled, `<release>-broker-azure.<namespace>.svc.cluster.local`. `feedTLSSecret` covers `<release>-broker-feed.<namespace>.svc.cluster.local`. The CA Secret contains `ca.crt` trusting both servers at these internal Service DNS names. Per-leg overrides are available under `accessBroker.transport.sandboxToBroker.mode` and `.brokerToFeed.mode`. Configure certificates only for TLS legs.
 
-Alternatively, if cert-manager is already installed, set `accessBroker.issuerRef: {name: platform-internal, kind: ClusterIssuer}` instead of `tlsSecret` and `feedTLSSecret`. The chart creates Certificates for the enabled TLS legs. The issuer must support the internal Service DNS names. A private issuer still requires the trusted `caSecret`; the chart does not infer CA trust from an issuer. Do not configure managed and existing TLS Secrets together. Roll the corresponding broker/controller workloads after certificate renewal so the listeners load the new key pair.
+Alternatively, if cert-manager is already installed, set `accessBroker.issuerRef: {name: platform-internal, kind: ClusterIssuer}` instead of `tlsSecret` and `feedTLSSecret`. The chart creates Certificates for the enabled TLS legs. The issuer must support the internal Service DNS names. `issuerRef` requires `caSecret` and fails at render time when it is missing; the chart does not infer CA trust from an issuer. Do not configure managed and existing TLS Secrets together. Roll the corresponding broker/controller workloads after certificate renewal so the listeners load the new key pair.
 
 #### Sandbox and network setup
 

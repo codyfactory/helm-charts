@@ -63,6 +63,20 @@ if rg -q 'fixture-broker-azure|serviceaccounts/token|impersonate|IDENTITY_ENDPOI
 fi
 azure_broker="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true)"
 rg -q 'name: fixture-broker-azure' <<<"$azure_broker"
+controller_rbac="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --show-only templates/rbac.yaml)"
+rg -U -q 'resources: \[serviceaccounts\]\n    verbs: \[get\]' <<<"$controller_rbac"
+test "$(rg -c 'resources: \[pods, serviceaccounts\]' <<<"$azure_broker")" = 2
+rg -U -q 'resources: \[pods, serviceaccounts\]\n    verbs: \[get, watch\]' <<<"$azure_broker"
+if rg -q 'resourceNames:' <<<"$controller_rbac"; then
+  echo 'Controller ServiceAccount metadata lookup unexpectedly requires per-profile grants' >&2
+  exit 1
+fi
+rg -U -q 'resources: \[serviceaccounts\]\n    resourceNames: \[sre-reader\]\n    verbs: \[impersonate\]' examples/access-profile.yaml
+rg -U -q 'resources: \[serviceaccounts/token\]\n    resourceNames: \[sre-reader\]\n    verbs: \[create\]' examples/access-profile-azure-rbac.yaml
+if rg -q 'sre-profile-resolver|verbs: \[get, watch\]' examples/access-profile.yaml examples/access-profile-azure-rbac.yaml; then
+  echo 'Profile examples unexpectedly require metadata observation grants' >&2
+  exit 1
+fi
 test "$(rg -c -- '--kube-api-qps=20' <<<"$azure_broker")" = 2
 test "$(rg -c -- '--kube-api-burst=40' <<<"$azure_broker")" = 2
 broker_limits="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.azure.enabled=true,kubernetes.burst=25 --set-json kubernetes.qps=12.5)"
@@ -105,11 +119,17 @@ if rg -q -- '--tls-cert=|mountPath: /broker-ca' <<<"$mixed"; then
   echo 'HTTP sandbox leg unexpectedly configures TLS' >&2
   exit 1
 fi
-managed="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.azure.enabled=true)"
+managed="$(helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.caSecret=trust,accessBroker.azure.enabled=true)"
 test "$(rg -c '^kind: Certificate$' <<<"$managed")" = 2
+rg -q '"caFile":"/broker-ca/ca.crt"' <<<"$managed"
+rg -q -- '--feed-ca=/etc/cody/feed-ca/ca.crt' <<<"$managed"
+if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal >/dev/null 2>&1; then
+  echo 'Managed TLS without a CA Secret unexpectedly rendered' >&2
+  exit 1
+fi
 rg -q 'secretName: fixture-broker-tls' <<<"$managed"
 rg -q 'fixture-broker-azure.default.svc.cluster.local' <<<"$managed"
-if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.tlsSecret=ambiguous >/dev/null 2>&1; then
+if helm template fixture "$chart" -f "$values" -f examples/broker.yaml --set accessBroker.transport.mode=tls,accessBroker.issuerRef.name=internal,accessBroker.caSecret=trust,accessBroker.tlsSecret=ambiguous >/dev/null 2>&1; then
   echo 'Mixed managed and existing TLS Secrets unexpectedly rendered' >&2
   exit 1
 fi

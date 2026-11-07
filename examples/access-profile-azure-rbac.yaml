@@ -9,10 +9,6 @@ metadata:
   namespace: default
 rules:
   - apiGroups: ['']
-    resources: [serviceaccounts]
-    resourceNames: [sre-reader]
-    verbs: [get, watch]
-  - apiGroups: ['']
     resources: [serviceaccounts/token]
     resourceNames: [sre-reader]
     verbs: [create]

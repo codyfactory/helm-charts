@@ -10,6 +10,9 @@ rules:
     resources: [agents, workflows]
     verbs: [get, list, watch]
   {{- if .Values.accessBroker.enabled }}
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    verbs: [get]
   - apiGroups: [execution.cody.so]
     resources: [accessprofiles]
     verbs: [get]
