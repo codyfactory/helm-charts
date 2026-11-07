@@ -203,7 +203,7 @@ spec:
 
 {{- if .Values.accessBroker.enabled }}
 {{- $transport := include "cody.brokerTransport" . -}}
-{{- $scheme := ternary "https" "http" (eq $transport "tls") -}}
+{{- $scheme := ternary "https" "http" (eq $transport "tls") }}
 ---
 apiVersion: v1
 kind: ConfigMap
