@@ -22,7 +22,11 @@ spec:
           properties:
             spec:
               type: object
-              required: [kubernetes]
+              x-kubernetes-validations:
+                - rule: has(self.kubernetes) || has(self.github)
+                  message: At least one supported access block is required
+                - rule: '!has(self.azure) || has(self.kubernetes)'
+                  message: Azure requires a Kubernetes ServiceAccount
               properties:
                 kubernetes:
                   type: object
@@ -33,6 +37,24 @@ spec:
                       required: [name]
                       properties:
                         name: {type: string, minLength: 1, maxLength: 253}
+                github:
+                  type: object
+                  required: [connectorRef, repositories, permissions]
+                  properties:
+                    connectorRef: {type: string, minLength: 1}
+                    repositories:
+                      type: array
+                      minItems: 1
+                      maxItems: 500
+                      x-kubernetes-list-type: set
+                      items: {type: string, minLength: 3}
+                    permissions:
+                      type: object
+                      minProperties: 1
+                      additionalProperties: {type: string, enum: [read, write]}
+                      x-kubernetes-validations:
+                        - rule: self.all(k, k in ['contents', 'pull_requests'])
+                          message: Only Cody contents and pull_requests capabilities are supported
                 azure:
                   type: object
                   required: [tenantID, clientID, allowedResources]

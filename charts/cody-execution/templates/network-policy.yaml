@@ -1,3 +1,14 @@
+{{- if .Values.accessBroker.github.enabled }}
+{{- $githubHosts := list }}
+{{- range .Values.accessBroker.github.upstreamHosts }}
+{{- $githubHosts = append $githubHosts (lower .) }}
+{{- end }}
+{{- range .Values.networkPolicy.toolDomains }}
+{{- if or (has (lower .) $githubHosts) (eq (lower .) "github.com") (eq (lower .) "api.github.com") }}
+{{- fail "Brokered GitHub hosts must not appear in networkPolicy.toolDomains" }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if .Values.networkPolicy.enabled }}
 {{- range .Values.networkPolicy.toolDomains }}
 {{- if or (contains "openrouter" (lower .)) (contains "openai" (lower .)) (contains "anthropic" (lower .)) (contains "*" .) }}
@@ -30,6 +41,9 @@ spec:
               - matchName: {{ printf "%s-execution-plane.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- if .Values.accessBroker.enabled }}
               - matchName: {{ printf "%s-broker-kubernetes.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- if .Values.accessBroker.github.enabled }}
+              - matchName: {{ printf "%s-broker-github.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- end }}
               {{- if .Values.accessBroker.azure.enabled }}
               - matchName: {{ printf "%s-broker-azure.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               - matchName: management.azure.com
@@ -64,6 +78,16 @@ spec:
         - ports:
             - port: "8443"
               protocol: TCP
+    {{- if .Values.accessBroker.github.enabled }}
+    - toEndpoints:
+        - matchLabels:
+            app: {{ .Release.Name }}-broker-github
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+    {{- end }}
     {{- if .Values.accessBroker.azure.enabled }}
     - toEndpoints:
         - matchLabels:

@@ -436,6 +436,27 @@
               "name"
             ]
           }
+        },
+        "github": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "upstreamHosts"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "upstreamHosts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$"
+              }
+            }
+          }
         }
       }
     }

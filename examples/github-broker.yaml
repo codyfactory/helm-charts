@@ -1,0 +1,15 @@
+networkPolicy:
+  enabled: true
+accessBroker:
+  enabled: true
+  transport:
+    mode: tls
+  tlsSecret: cody-broker-tls
+  feedTLSSecret: cody-broker-feed-tls
+  networkPolicy:
+    provider: cilium
+  github:
+    enabled: true
+    upstreamHosts:
+      - github.com
+      - api.github.com

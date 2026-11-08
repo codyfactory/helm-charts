@@ -1,0 +1,25 @@
+apiVersion: execution.cody.so/v1alpha1
+kind: AccessProfile
+metadata:
+  name: github-contributor
+spec:
+  github:
+    connectorRef: company-github
+    repositories:
+      - example/application
+    permissions:
+      contents: write
+      pull_requests: write
+---
+apiVersion: execution.cody.so/v1alpha1
+kind: AccessProfile
+metadata:
+  name: github-reader
+spec:
+  github:
+    connectorRef: company-github
+    repositories:
+      - example/application
+    permissions:
+      contents: read
+      pull_requests: read

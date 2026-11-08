@@ -188,3 +188,27 @@ for azure in false true; do
     helm template fixture "$chart" -f "$values" -f examples/broker.yaml "${args[@]}" | validate_documents
   done
 done
+
+github="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml)"
+rg -q -- '--mode=github' <<<"$github"
+rg -q -- '--github-broker-service-account=default/fixture-broker-github' <<<"$github"
+rg -q '"githubEndpoint":"https://fixture-broker-github.default.svc.cluster.local"' <<<"$github"
+rg -q 'name: fixture-github-broker' <<<"$github"
+printf '%s\n' "$github" | validate_documents
+for invalid in 'networkPolicy.toolDomains[0]=github.com' 'networkPolicy.toolDomains[0]=api.github.com' 'accessBroker.enabled=false' 'accessBroker.github.upstreamHosts={}' ; do
+  if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid GitHub configuration rendered: $invalid" >&2
+    exit 1
+  fi
+done
+fixture_hosts="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.upstreamHosts={forge.fixture,api.forge.fixture}')"
+rg -q 'matchName: "forge.fixture"' <<<"$fixture_hosts"
+if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.upstreamHosts={forge.fixture,api.forge.fixture}' --set 'networkPolicy.toolDomains[0]=forge.fixture' >/dev/null 2>&1; then
+  echo 'Connector-host bypass unexpectedly rendered' >&2
+  exit 1
+fi
+
+if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.upstreamHosts={Forge.Fixture,API.Forge.Fixture}' --set 'networkPolicy.toolDomains[0]=forge.fixture' >/dev/null 2>&1; then
+  echo 'Case-equivalent connector-host bypass unexpectedly rendered' >&2
+  exit 1
+fi
