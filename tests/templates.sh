@@ -249,3 +249,11 @@ if rg -q 'kind: CiliumNetworkPolicy' <<<"$external_downloads"; then
   exit 1
 fi
 rg -q -F "!('actions' in self) || self.actions == 'read'" charts/cody-execution/crds/accessprofiles.yaml
+
+unenforced="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.networkPolicy.provider=none,networkPolicy.enabled=false,accessBroker.networkPolicy.externalEnforcementConfigured=false')"
+if rg -q 'kind: CiliumNetworkPolicy' <<<"$unenforced"; then
+  echo 'Network enforcement opt-out rendered a Cilium policy' >&2
+  exit 1
+fi
+rg -q 'name: fixture-broker-github' <<<"$unenforced"
+rg -q 'maxLength: 65536' "$chart/crds/agents.yaml"

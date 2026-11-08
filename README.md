@@ -278,3 +278,9 @@ checkout; never add a sandbox GitHub egress exception to repair a mixed rollout.
 Local rendering and native-client fixtures do not establish live GitHub App,
 branch-protection, model-harness or AKS Cilium/ACNS acceptance. Verify those in the
 installation before treating the deployment as ready.
+
+### Optional broker network enforcement
+
+On Calico or another cluster without Cilium, explicitly set `accessBroker.networkPolicy.provider: none` and `networkPolicy.enabled: false` to run the broker without chart-enforced egress containment. Credential authorization and tenant checks remain enabled. This mode does not prevent sandbox bypass of the broker through other network paths. Defaults still require an enforcement choice; `external` continues to require confirmation of external enforcement.
+
+Agent `agentsMD` accepts up to 65,536 characters. Skill names may contain colon-separated namespace segments, for example `alpheya:create-pr`; reference-input names retain their existing syntax.

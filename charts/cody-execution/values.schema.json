@@ -349,6 +349,7 @@
             "provider": {
               "enum": [
                 "",
+                "none",
                 "cilium",
                 "external"
               ]
