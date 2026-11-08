@@ -1,4 +1,5 @@
 {{- if and .Values.accessBroker.enabled .Values.accessBroker.github.enabled (eq .Values.accessBroker.networkPolicy.provider "cilium") }}
+{{- $hosts := concat .Values.accessBroker.github.upstreamHosts (include "cody.githubDownloadHosts" . | fromJsonArray) | uniq }}
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -33,8 +34,8 @@ spec:
           rules:
             dns:
               - matchName: {{ printf "%s-broker-feed.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
-              {{- range .Values.accessBroker.github.upstreamHosts }}
-              - matchName: {{ . | quote }}
+              {{- range $hosts }}
+              - matchName: {{ lower . | quote }}
               {{- end }}
     - toEndpoints:
         - matchLabels:
@@ -52,15 +53,15 @@ spec:
             - port: "6443"
               protocol: TCP
     - toFQDNs:
-        {{- range .Values.accessBroker.github.upstreamHosts }}
-        - matchName: {{ . | quote }}
+        {{- range $hosts }}
+        - matchName: {{ lower . | quote }}
         {{- end }}
       toPorts:
         - ports:
             - port: "443"
               protocol: TCP
           serverNames:
-            {{- range .Values.accessBroker.github.upstreamHosts }}
-            - {{ . | quote }}
+            {{- range $hosts }}
+            - {{ lower . | quote }}
             {{- end }}
 {{- end }}

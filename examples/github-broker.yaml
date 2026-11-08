@@ -13,3 +13,4 @@ accessBroker:
     upstreamHosts:
       - github.com
       - api.github.com
+    downloadHosts: []

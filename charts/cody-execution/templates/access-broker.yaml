@@ -1,4 +1,5 @@
 {{- $broker := .Values.accessBroker -}}
+{{- $downloadHosts := include "cody.githubDownloadHosts" . | fromJsonArray -}}
 {{- if and (or $broker.azure.enabled $broker.github.enabled) (not $broker.enabled) -}}
 {{- fail "Optional brokers require accessBroker.enabled" -}}
 {{- end -}}
@@ -64,6 +65,9 @@ spec:
           args:
             - broker
             - --mode={{ $mode }}
+            {{- if and (eq $mode "github") $downloadHosts }}
+            - --github-download-hosts={{ join "," $downloadHosts }}
+            {{- end }}
             - --kube-api-qps={{ $.Values.kubernetes.qps }}
             - --kube-api-burst={{ $.Values.kubernetes.burst }}
             - --sandbox-service-account={{ $.Release.Name }}-sandbox

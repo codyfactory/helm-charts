@@ -201,7 +201,9 @@ On AKS, FQDN filtering requires Azure CNI Powered by Cilium and Advanced Contain
 Networking Services (ACNS); rendered manifests alone do not prove enforcement.
 
 `examples/github-profile.yaml` provides reader and contributor AccessProfiles.
-The capabilities are `contents` and `pull_requests`, each `read` or `write`.
+The capabilities are `contents` and `pull_requests`, each `read` or `write`,
+and `actions: read`. Actions write is unsupported and reviews receive no implicit
+Actions permission.
 GitHub-only profiles need no selected Kubernetes ServiceAccount. Azure still
 requires its Kubernetes identity. Writes use standing administrator grants and
 retain GitHub's native scope: apply branch protections/rulesets and inspect App
@@ -216,15 +218,30 @@ uses mutable repository paths, so a concurrent rename/slug-reuse race between
 that check and the Git operation remains an accepted limitation; exact-scoped
 tokens and per-request identity checks still apply.
 
-Git smart HTTP remains streamed. Nonempty API responses must be JSON
+Git smart HTTP remains streamed. Metadata API responses must be JSON
 (`application/json` or `application/*+json`), at most 8 MiB and 64 levels deep.
 The broker requests identity encoding, buffers the response before forwarding,
 and recursively removes `temp_clone_token` and `download_url`. It removes API
 `Location` headers and invalidated validators/digests from rewritten bodies.
-Empty responses, HEAD and 204 remain supported. Raw/diff/archive/binary API modes
-are unsupported; use Git or supported JSON APIs instead of download capabilities.
+Empty responses, HEAD and 204 remain supported. Selected GET operations stream
+repository zip/tar archives, Actions run/job logs, Actions artifact zip downloads,
+and release assets requested as `application/octet-stream`. The broker follows at
+most five redirects under the same live lease and strips authentication from
+redirected blob requests. It exposes neither signed redirect URLs nor download
+credentials to the sandbox. Other raw/diff/binary metadata modes remain unsupported.
 API request bodies remain unchanged and are not parsed into a second permission
 matrix. Include these response limits in native-client acceptance after upgrades.
+
+Configure `accessBroker.github.downloadHosts` with the exact DNS names used by
+these downloads. Its default `[]` disables external redirect following. The same
+normalized list becomes `--github-download-hosts` and broker-only DNS/FQDN/SNI
+Cilium egress rules. Names are case-insensitive; duplicate names, IP addresses,
+ports, URLs and wildcards are rejected. Do not add these hosts to sandbox
+`networkPolicy.toolDomains`. With external enforcement, configure equivalent
+broker-only HTTPS egress to the exact download hosts and retain sandbox denial
+before setting `externalEnforcementConfigured`. The list is an operator network
+allowance, not a repository grant; the initiating API request still uses the
+lease's scoped token. Restrict the list to the provider's actual download hosts.
 
 Reviews require the broker too. Without a selected AccessProfile, an authorized
 review lease grants repository-wide contents reads to both checkout preparation

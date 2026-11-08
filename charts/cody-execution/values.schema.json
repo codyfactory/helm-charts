@@ -442,7 +442,8 @@
           "additionalProperties": false,
           "required": [
             "enabled",
-            "upstreamHosts"
+            "upstreamHosts",
+            "downloadHosts"
           ],
           "properties": {
             "enabled": {
@@ -454,6 +455,16 @@
               "items": {
                 "type": "string",
                 "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$"
+              }
+            },
+            "downloadHosts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
               }
             }
           }

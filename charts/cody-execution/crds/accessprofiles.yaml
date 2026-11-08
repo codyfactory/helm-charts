@@ -53,8 +53,10 @@ spec:
                       minProperties: 1
                       additionalProperties: {type: string, enum: [read, write]}
                       x-kubernetes-validations:
-                        - rule: self.all(k, k in ['contents', 'pull_requests'])
-                          message: Only Cody contents and pull_requests capabilities are supported
+                        - rule: self.all(k, k in ['contents', 'pull_requests', 'actions'])
+                          message: Only Cody contents, pull_requests and actions capabilities are supported
+                        - rule: "!('actions' in self) || self.actions == 'read'"
+                          message: Actions capability supports read only
                 azure:
                   type: object
                   required: [tenantID, clientID, allowedResources]

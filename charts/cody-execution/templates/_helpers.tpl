@@ -38,3 +38,15 @@
 {{- .Values.accessBroker.feedTLSSecret -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "cody.githubDownloadHosts" -}}
+{{- $hosts := list -}}
+{{- range .Values.accessBroker.github.downloadHosts -}}
+{{- $host := lower . -}}
+{{- if or (gt (len $host) 253) (not (regexMatch "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$" $host)) (regexMatch "^[0-9.]+$" $host) (has $host $hosts) -}}
+{{- fail "accessBroker.github.downloadHosts requires unique exact DNS hosts without IPs, ports, URLs or wildcards" -}}
+{{- end -}}
+{{- $hosts = append $hosts $host -}}
+{{- end -}}
+{{- toJson $hosts -}}
+{{- end -}}
