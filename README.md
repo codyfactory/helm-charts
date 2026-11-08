@@ -209,11 +209,22 @@ bypass settings when direct pushes or merges should be restricted. The broker
 does not prompt for per-write approval or automatically approve pull requests.
 GitHub installation tokens implicitly include repository metadata access. GitHub
 may also expose public resources outside the selected repository IDs; the broker
-preserves provider behavior rather than imposing a separate REST path policy.
+retains that provider permission behavior. It separately denies credential-management
+API endpoints so a caller cannot revoke a shared installation token.
 Git requests check frozen repository IDs immediately before forwarding. GitHub
 uses mutable repository paths, so a concurrent rename/slug-reuse race between
 that check and the Git operation remains an accepted limitation; exact-scoped
 tokens and per-request identity checks still apply.
+
+Git smart HTTP remains streamed. Nonempty API responses must be JSON
+(`application/json` or `application/*+json`), at most 8 MiB and 64 levels deep.
+The broker requests identity encoding, buffers the response before forwarding,
+and recursively removes `temp_clone_token` and `download_url`. It removes API
+`Location` headers and invalidated validators/digests from rewritten bodies.
+Empty responses, HEAD and 204 remain supported. Raw/diff/archive/binary API modes
+are unsupported; use Git or supported JSON APIs instead of download capabilities.
+API request bodies remain unchanged and are not parsed into a second permission
+matrix. Include these response limits in native-client acceptance after upgrades.
 
 Reviews require the broker too. Without a selected AccessProfile, an authorized
 review lease grants repository-wide contents reads to both checkout preparation
