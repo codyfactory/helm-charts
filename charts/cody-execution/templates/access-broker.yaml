@@ -16,7 +16,7 @@
 {{- $feedScheme := ternary "https" "http" (eq $feedTransport "tls") -}}
 {{- $ca := $broker.caSecret -}}
 {{- if lt (int $broker.replicas) 2 -}}{{- fail "accessBroker.replicas must be at least 2" -}}{{- end -}}
-{{- if not (or (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
+{{- if not (or (eq $broker.networkPolicy.provider "none") (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
 {{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
 {{- end -}}
 {{- if and $broker.github.enabled (not $broker.github.upstreamHosts) -}}{{- fail "GitHub broker requires connector-derived upstreamHosts" -}}{{- end -}}

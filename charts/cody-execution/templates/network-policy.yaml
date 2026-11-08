@@ -1,4 +1,4 @@
-{{- if .Values.accessBroker.github.enabled }}
+{{- if and .Values.accessBroker.github.enabled (ne .Values.accessBroker.networkPolicy.provider "none") }}
 {{- $githubHosts := list }}
 {{- range concat .Values.accessBroker.github.upstreamHosts (include "cody.githubDownloadDomains" . | fromJsonArray) }}
 {{- $githubHosts = append $githubHosts (lower .) }}

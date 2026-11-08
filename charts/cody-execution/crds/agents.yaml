@@ -178,7 +178,7 @@ spec:
                           type: string
                           nullable: true
                           maxLength: 63
-                          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+                          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(:[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$'
                       source:
                         type: object
                         nullable: true
@@ -327,7 +327,7 @@ spec:
                   description: Standing instructions for the Agent, supplied alongside repository instructions.
                   type: string
                   minLength: 1
-                  maxLength: 4096
+                  maxLength: 65536
                 requiredCapabilities:
                   type: array
                   items:
