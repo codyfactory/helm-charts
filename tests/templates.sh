@@ -316,3 +316,11 @@ for invalid in 'accessBroker.enabled=false' 'accessBroker.tools.externalEndpoint
     exit 1
   fi
 done
+tools_role="$(awk 'BEGIN { RS="---" } /kind: Role/ && /name: fixture-broker-tools-pods/ { print }' <<<"$tools")"
+rg -q 'resources: \[pods, serviceaccounts\]' <<<"$tools_role"
+if rg -q 'resources:.*secrets|verbs:.*\*' <<<"$tools_role"; then
+  echo 'Tools broker must not have Secret-read or wildcard RBAC' >&2
+  exit 1
+fi
+tools_service="$(awk 'BEGIN { RS="---" } /kind: Service[[:space:]]/ && /name: fixture-broker-tools/ { print }' <<<"$tools")"
+rg -q 'sessionAffinity: ClientIP' <<<"$tools_service"
