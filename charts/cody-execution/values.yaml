@@ -60,3 +60,6 @@ accessBroker:
     externalEnforcementConfigured: false
   azure:
     enabled: false
+  github:
+    enabled: false
+    upstreamHosts: []

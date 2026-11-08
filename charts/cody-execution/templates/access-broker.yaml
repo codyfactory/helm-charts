@@ -1,6 +1,6 @@
 {{- $broker := .Values.accessBroker -}}
-{{- if and $broker.azure.enabled (not $broker.enabled) -}}
-{{- fail "accessBroker.azure.enabled requires accessBroker.enabled" -}}
+{{- if and (or $broker.azure.enabled $broker.github.enabled) (not $broker.enabled) -}}
+{{- fail "Optional brokers require accessBroker.enabled" -}}
 {{- end -}}
 {{- if $broker.enabled -}}
 {{- $transport := include "cody.brokerTransport" . -}}
@@ -19,7 +19,9 @@
 {{- if not (or (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
 {{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
 {{- end -}}
+{{- if and $broker.github.enabled (not $broker.github.upstreamHosts) -}}{{- fail "GitHub broker requires connector-derived upstreamHosts" -}}{{- end -}}
 {{- $modes := list "kubernetes" -}}
+{{- if $broker.github.enabled -}}{{- $modes = append $modes "github" -}}{{- end -}}
 {{- if $broker.azure.enabled -}}{{- $modes = append $modes "azure" -}}{{- end -}}
 ---
 apiVersion: v1
@@ -211,11 +213,13 @@ metadata:
   name: {{ .Release.Name }}-broker-config
 data:
   config.json: |
+    {{- $githubEndpoint := "" -}}
+    {{- if .Values.accessBroker.github.enabled -}}{{- $githubEndpoint = printf "%s://%s-broker-github.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace -}}{{- end -}}
     {{- $azureEndpoint := "" -}}
     {{- if .Values.accessBroker.azure.enabled -}}{{- $azureEndpoint = printf "%s://%s-broker-azure.%s.svc.cluster.local/msi/token" $scheme .Release.Name .Release.Namespace -}}{{- end }}
     {{- $caFile := "" -}}
     {{- if and (eq $transport "tls") .Values.accessBroker.caSecret -}}{{- $caFile = "/broker-ca/ca.crt" -}}{{- end }}
-    {{ dict "kubernetesEndpoint" (printf "%s://%s-broker-kubernetes.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace) "azureEndpoint" $azureEndpoint "caFile" $caFile "transportMode" $transport | toJson }}
+    {{ dict "kubernetesEndpoint" (printf "%s://%s-broker-kubernetes.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace) "githubEndpoint" $githubEndpoint "azureEndpoint" $azureEndpoint "caFile" $caFile "transportMode" $transport | toJson }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -237,6 +241,11 @@ subjects:
   - kind: ServiceAccount
     name: {{ .Release.Name }}-broker-kubernetes
     namespace: {{ .Release.Namespace }}
+  {{- if .Values.accessBroker.github.enabled }}
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-broker-github
+    namespace: {{ .Release.Namespace }}
+  {{- end }}
   {{- if .Values.accessBroker.azure.enabled }}
   - kind: ServiceAccount
     name: {{ .Release.Name }}-broker-azure

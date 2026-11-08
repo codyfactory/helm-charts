@@ -19,6 +19,9 @@ spec:
     - {{ printf "%s-broker-feed.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
     {{- else }}
     - {{ printf "%s-broker-kubernetes.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
+    {{- if $.Values.accessBroker.github.enabled }}
+    - {{ printf "%s-broker-github.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
+    {{- end }}
     {{- if $.Values.accessBroker.azure.enabled }}
     - {{ printf "%s-broker-azure.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
     {{- end }}

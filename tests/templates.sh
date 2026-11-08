@@ -188,3 +188,64 @@ for azure in false true; do
     helm template fixture "$chart" -f "$values" -f examples/broker.yaml "${args[@]}" | validate_documents
   done
 done
+
+github="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml)"
+rg -q -- '--mode=github' <<<"$github"
+rg -q -- '--github-broker-service-account=default/fixture-broker-github' <<<"$github"
+rg -q '"githubEndpoint":"https://fixture-broker-github.default.svc.cluster.local"' <<<"$github"
+rg -q 'name: fixture-github-broker' <<<"$github"
+printf '%s\n' "$github" | validate_documents
+for invalid in 'networkPolicy.toolDomains[0]=github.com' 'networkPolicy.toolDomains[0]=api.github.com' 'accessBroker.enabled=false' 'accessBroker.github.upstreamHosts={}' ; do
+  if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid GitHub configuration rendered: $invalid" >&2
+    exit 1
+  fi
+done
+fixture_hosts="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.upstreamHosts={forge.fixture,api.forge.fixture}')"
+rg -q 'matchName: "forge.fixture"' <<<"$fixture_hosts"
+if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.upstreamHosts={forge.fixture,api.forge.fixture}' --set 'networkPolicy.toolDomains[0]=forge.fixture' >/dev/null 2>&1; then
+  echo 'Connector-host bypass unexpectedly rendered' >&2
+  exit 1
+fi
+
+if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.upstreamHosts={Forge.Fixture,API.Forge.Fixture}' --set 'networkPolicy.toolDomains[0]=forge.fixture' >/dev/null 2>&1; then
+  echo 'Case-equivalent connector-host bypass unexpectedly rendered' >&2
+  exit 1
+fi
+
+broker_policy="$(awk 'BEGIN { RS="---" } /name: fixture-github-broker/ { print }' <<<"$github")"
+for domain in codeload.github.com '*.githubusercontent.com' '*.blob.core.windows.net'; do
+  test "$(rg -c -F "\"$domain\"" <<<"$broker_policy")" = 3
+done
+rg -q -F 'matchName: "codeload.github.com"' <<<"$broker_policy"
+rg -q -F 'matchPattern: "*.githubusercontent.com"' <<<"$broker_policy"
+rg -q -F 'matchPattern: "*.blob.core.windows.net"' <<<"$broker_policy"
+sandbox_policy="$(awk 'BEGIN { RS="---" } /name: fixture-sandbox-egress/ { print }' <<<"$github")"
+if rg -q 'codeload.github.com|githubusercontent.com|blob.core.windows.net' <<<"$sandbox_policy"; then
+  echo 'Managed download domain unexpectedly granted sandbox egress' >&2
+  exit 1
+fi
+if rg -q -- '--github-download-hosts=' <<<"$github"; then
+  echo 'Removed download configuration flag rendered' >&2
+  exit 1
+fi
+for setting in 'accessBroker.github.downloadHosts=["blob.example.com"]' 'accessBroker.github.downloadHosts=[]'; do
+  if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set-json "$setting" >/dev/null 2>&1; then
+    echo 'Removed download host configuration accepted' >&2
+    exit 1
+  fi
+done
+for domain in codeload.github.com objects.githubusercontent.com OBJECTS.GITHUBUSERCONTENT.COM productionresultssa19.blob.core.windows.net productionresultssa98.blob.core.windows.net '*.githubusercontent.com' '*.github.com'; do
+  for provider in cilium external; do
+    if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set "networkPolicy.toolDomains[0]=$domain" --set "accessBroker.networkPolicy.provider=$provider,accessBroker.networkPolicy.externalEnforcementConfigured=true" >/dev/null 2>&1; then
+      echo "Sandbox bypass of managed download domain rendered: $domain" >&2
+      exit 1
+    fi
+  done
+done
+external_downloads="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=true,networkPolicy.enabled=false')"
+if rg -q 'kind: CiliumNetworkPolicy' <<<"$external_downloads"; then
+  echo 'External enforcement mode unexpectedly emits Cilium policies' >&2
+  exit 1
+fi
+rg -q -F "!('actions' in self) || self.actions == 'read'" charts/cody-execution/crds/accessprofiles.yaml

@@ -38,3 +38,7 @@
 {{- .Values.accessBroker.feedTLSSecret -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "cody.githubDownloadDomains" -}}
+{{- list "codeload.github.com" "*.githubusercontent.com" "*.blob.core.windows.net" | toJson -}}
+{{- end -}}

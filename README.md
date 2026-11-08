@@ -187,3 +187,94 @@ Select `accessBroker.networkPolicy.provider=cilium` with `networkPolicy.enabled=
 The Kubernetes broker accepts only GET/HEAD requests and denies Secret reads in the sandbox namespace, including cluster-wide Secret enumeration. Write approval remains outside this slice. Authoritative Pod/ServiceAccount watches and periodic reads remain required. A feed interruption retains cached lease authorization only until its execution deadline; identity failures still deny access, and successors remain fenced until acknowledgement or expiry plus skew. Disabling or deleting a broker Deployment does not remove its outstanding fencing obligations.
 
 Broker pods use non-root, restricted capabilities and read-only filesystems without fixed UID/fsGroup. This does not validate the whole installation on OpenShift: sandbox runtime requirements and CNI behavior still need acceptance. Projected-token deployment, mesh enforcement and plaintext deployment acceptance remain unverified. Use a controlled Agent turn to test allowed reads, denied operations, identity changes, lease expiry and feed outages before enabling shared workloads.
+
+## GitHub broker
+
+Enable `accessBroker.github.enabled` with the controller/runtime revision that adds
+GitHub broker support. `examples/github-broker.yaml` shows the Cilium network and
+TLS settings. `upstreamHosts` is an installation network allowlist populated from
+the connector's trusted Git/API hosts; it grants no repository permissions. Keep
+it synchronized with connector configuration. These hosts must not appear in
+sandbox `networkPolicy.toolDomains`. External enforcement must supply equivalent
+sandbox denial, broker-only feed access and restricted broker upstream egress.
+On AKS, FQDN filtering requires Azure CNI Powered by Cilium and Advanced Container
+Networking Services (ACNS); rendered manifests alone do not prove enforcement.
+
+`examples/github-profile.yaml` provides reader and contributor AccessProfiles.
+The capabilities are `contents` and `pull_requests`, each `read` or `write`,
+and `actions: read`. Actions write is unsupported and reviews receive no implicit
+Actions permission.
+GitHub-only profiles need no selected Kubernetes ServiceAccount. Azure still
+requires its Kubernetes identity. Writes use standing administrator grants and
+retain GitHub's native scope: apply branch protections/rulesets and inspect App
+bypass settings when direct pushes or merges should be restricted. The broker
+does not prompt for per-write approval or automatically approve pull requests.
+GitHub installation tokens implicitly include repository metadata access. GitHub
+may also expose public resources outside the selected repository IDs; the broker
+retains that provider permission behavior. It separately denies credential-management
+API endpoints so a caller cannot revoke a shared installation token.
+Git requests check frozen repository IDs immediately before forwarding. GitHub
+uses mutable repository paths, so a concurrent rename/slug-reuse race between
+that check and the Git operation remains an accepted limitation; exact-scoped
+tokens and per-request identity checks still apply.
+
+Git smart HTTP remains streamed. Metadata API responses must be JSON
+(`application/json` or `application/*+json`), at most 8 MiB and 64 levels deep.
+The broker requests identity encoding, buffers the response before forwarding,
+and recursively removes `temp_clone_token` and `download_url`. It removes API
+`Location` headers and invalidated validators/digests from rewritten bodies.
+Empty responses, HEAD and 204 remain supported. Selected GET operations stream
+repository zip/tar archives, Actions run/job logs, Actions artifact zip downloads,
+and release assets requested as `application/octet-stream`. The broker follows at
+most five redirects under the same live lease and strips authentication from
+redirected blob requests. It exposes neither signed redirect URLs nor download
+credentials to the sandbox. Actual plain-text and GitHub diff/patch/raw media responses stream too, as does
+HTML from the Markdown rendering endpoints. Negotiated raw contents/blob GETs
+support binary bodies and managed download redirects. This includes
+`application/vnd.github.raw+json; charset=utf-8`, which contains raw file bytes
+despite its suffix. Ordinary JSON metadata, including directory listings returned
+as `application/json`, remains bounded and sanitized; other
+binary modes remain limited to the supported download operations.
+API request bodies remain unchanged and are not parsed into a second permission
+matrix. Include these response limits in native-client acceptance after upgrades.
+
+Cody owns the supported public-GitHub download domains: `codeload.github.com`,
+`*.githubusercontent.com` and `*.blob.core.windows.net`. No operator hostname
+setting or download-host flag is supported. The broker and chart ship this policy
+together; rotating Azure storage accounts need no per-account configuration.
+Each `*.` matches one DNS label, not the domain itself or nested subdomains.
+The chart uses DNS/FQDN `matchPattern` and TLS `serverNames` for these patterns,
+consistent with [Cilium's DNS matching](https://docs.cilium.io/en/stable/security/policy/layer3/#dns-based)
+and [SNI pattern semantics](https://github.com/cilium/cilium/blob/main/pkg/policy/api/l4.go).
+Use a Cilium version with that SNI pattern support; rendering is not live enforcement proof.
+
+Azure Blob Storage is shared infrastructure, not a GitHub-owned domain. Cody
+follows only backend redirects from supported, authenticated GitHub API GETs,
+without provider credentials on blob hops. These domains are broker-only network
+allowances, never sandbox egress grants. Sandbox tool-domain overlap is rejected.
+External enforcement must supply equivalent broker-only HTTPS policy and retain
+sandbox denial before setting `externalEnforcementConfigured`. Existing connector
+`upstreamHosts` configuration is unchanged. Additional enterprise download
+backends require Cody policy support; there is no ad hoc hostname override.
+
+Reviews require the broker too. Without a selected AccessProfile, an authorized
+review lease grants repository-wide contents reads to both checkout preparation
+and the harness. A selected profile replaces that default entirely; it must
+include the review repository and contents read/write. Invalid or disjoint
+profiles never fall back. Review publication remains pinned to its original head.
+
+Provider tokens remain outside sandbox processes and may be shared across leases
+with identical scopes. Each request still requires its own live lease and Pod
+identity. Ending one lease does not revoke another lease's shared provider token.
+Runtime images package `gh`; native clients receive a non-secret placeholder and
+a runtime-owned public trust bundle, without changing the system trust store.
+
+Roll out the matched controller, broker, runtime images and this chart together.
+Do not enable GitHub-backed Agents/reviews until connector permissions, effective
+CNI isolation and both supported harnesses have passed acceptance. Disable new
+work and drain active leases before rolling back to revisions using direct review
+checkout; never add a sandbox GitHub egress exception to repair a mixed rollout.
+
+Local rendering and native-client fixtures do not establish live GitHub App,
+branch-protection, model-harness or AKS Cilium/ACNS acceptance. Verify those in the
+installation before treating the deployment as ready.
