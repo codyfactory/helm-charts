@@ -230,8 +230,10 @@ most five redirects under the same live lease and strips authentication from
 redirected blob requests. It exposes neither signed redirect URLs nor download
 credentials to the sandbox. Actual plain-text and GitHub diff/patch/raw media responses stream too, as does
 HTML from the Markdown rendering endpoints. Negotiated raw contents/blob GETs
-support binary bodies and managed download redirects. Actual JSON/+json responses
-remain bounded and sanitized regardless of the requested representation; other
+support binary bodies and managed download redirects. This includes
+`application/vnd.github.raw+json; charset=utf-8`, which contains raw file bytes
+despite its suffix. Ordinary JSON metadata, including directory listings returned
+as `application/json`, remains bounded and sanitized; other
 binary modes remain limited to the supported download operations.
 API request bodies remain unchanged and are not parsed into a second permission
 matrix. Include these response limits in native-client acceptance after upgrades.
