@@ -15,7 +15,7 @@ rules:
     verbs: [get]
   - apiGroups: [execution.cody.so]
     resources: [accessprofiles]
-    verbs: [get]
+    verbs: [get, list, watch]
   - apiGroups: [execution.cody.so]
     resources: [accessprofiles/status]
     verbs: [update]

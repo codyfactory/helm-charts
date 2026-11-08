@@ -1,5 +1,5 @@
 {{- if and .Values.accessBroker.enabled .Values.accessBroker.packages.enabled (eq .Values.accessBroker.networkPolicy.provider "cilium") }}
-{{- $hosts := .Values.accessBroker.packages.upstreamHosts | uniq }}
+{{- $hosts := concat .Values.accessBroker.packages.upstreamHosts (include "cody.packageDownloadHosts" . | fromJsonArray) | uniq }}
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -35,7 +35,7 @@ spec:
             dns:
               - matchName: {{ printf "%s-broker-feed.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- range $hosts }}
-              - {{ ternary "matchPattern" "matchName" (hasPrefix "*." .) }}: {{ lower . | quote }}
+              - matchName: {{ lower . | quote }}
               {{- end }}
     - toEndpoints:
         - matchLabels:
@@ -54,7 +54,7 @@ spec:
               protocol: TCP
     - toFQDNs:
         {{- range $hosts }}
-        - {{ ternary "matchPattern" "matchName" (hasPrefix "*." .) }}: {{ lower . | quote }}
+        - matchName: {{ lower . | quote }}
         {{- end }}
       toPorts:
         - ports:

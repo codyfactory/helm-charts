@@ -1,6 +1,6 @@
 {{- if and .Values.accessBroker.packages.enabled (ne .Values.accessBroker.networkPolicy.provider "none") }}
 {{- $hosts := list }}
-{{- range .Values.accessBroker.packages.upstreamHosts }}{{- $hosts = append $hosts (lower .) }}{{- end }}
+{{- range concat .Values.accessBroker.packages.upstreamHosts (include "cody.packageDownloadHosts" . | fromJsonArray) }}{{- $hosts = append $hosts (lower .) }}{{- end }}
 {{- range .Values.networkPolicy.toolDomains }}
 {{- if or (contains "*" .) (has (lower .) $hosts) }}
 {{- fail "Package registry hosts must not appear in networkPolicy.toolDomains" }}

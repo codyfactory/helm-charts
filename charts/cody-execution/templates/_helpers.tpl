@@ -42,3 +42,11 @@
 {{- define "cody.githubDownloadDomains" -}}
 {{- list "codeload.github.com" "*.githubusercontent.com" "*.blob.core.windows.net" | toJson -}}
 {{- end -}}
+
+{{- define "cody.packageDownloadHosts" -}}
+{{- $hosts := list -}}
+{{- range .Values.accessBroker.packages.upstreamHosts -}}
+{{- if eq (lower .) "npm.pkg.github.com" -}}{{- $hosts = append $hosts "pkg-npm.githubusercontent.com" -}}{{- end -}}
+{{- end -}}
+{{- $hosts | uniq | toJson -}}
+{{- end -}}

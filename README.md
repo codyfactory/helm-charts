@@ -296,7 +296,9 @@ credentials.
 `examples/packages-broker.yaml` configures the dedicated broker and its Cilium
 network policy. `upstreamHosts` is the installation firewall allowlist; profile
 endpoint roots independently authorize each lease. Include every configured
-registry/download host in that firewall list. The sandbox must not have direct
+registry/download host in that firewall list. GitHub Packages automatically adds
+`pkg-npm.githubusercontent.com` as a redirect-only download host; operators do
+not need to add it as an endpoint or firewall entry. The sandbox must not have direct
 egress to these hosts; the chart rejects overlapping `networkPolicy.toolDomains`
 when enforcement is enabled. External policies must provide equivalent isolation.
 
@@ -311,12 +313,23 @@ controller reads them; package broker Pods receive neither Secret mounts nor
 Secret-read RBAC.
 
 The initial transport is download-only (GET/HEAD). It preserves original registry
-URLs and lockfiles, including scoped package paths. Redirects must stay within
-configured endpoints of the same grant; credentials are not forwarded across
-origins. Package publishing, automatic OAuth login and arbitrary CDN destinations
+URLs and lockfiles, including scoped package paths. Credentialed roots belong in
+`endpoints`; custom credential-free CDN hosts belong in `downloadHosts` and the
+installation firewall list. Download hosts are reachable only through redirects,
+never directly through the sandbox forwarder. Redirects must stay within the
+selected grant's endpoints or download hosts; credentials are stripped on crossing
+origins and never restored later in that chain. Package publishing, automatic OAuth login and arbitrary CDN destinations
 are unsupported. Add only verified endpoint roots; granting a hostname does not
 restrict individual packages under that root. Upstream credential permissions
-remain the package authorization boundary.
+remain the package authorization boundary. Registry Secrets are reserved from
+Agent `credentialRef`, including across Agents. Missing authentication keys mark
+the profile unavailable.
+
+The broker coalesces credential acquisition and caches it per lease and frozen
+registry grant for up to 30 seconds, bounded by lease expiry. Same-UID Secret data
+rotation becomes visible on the next acquisition; lease and Pod authorization
+still run for every request. Native clients receive a non-secret
+`NODE_AUTH_TOKEN` placeholder for existing `.npmrc` interpolation.
 
 Private Go modules fetched from GitHub use the existing GitHub repository grant,
 not a package-registry PAT. Grant every private dependency repository, configure

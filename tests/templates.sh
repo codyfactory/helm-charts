@@ -280,3 +280,17 @@ done
 mixed_packages="$(helm template fixture "$chart" -f "$values" -f examples/packages-broker.yaml -f examples/github-broker.yaml --set accessBroker.azure.enabled=true,accessBroker.issuerRef.name=issuer,accessBroker.tlsSecret=,accessBroker.feedTLSSecret=,accessBroker.caSecret=ca)"
 rg -q 'fixture-broker-packages.default.svc.cluster.local' <<<"$mixed_packages"
 printf '%s\n' "$mixed_packages" | validate_documents
+
+rg -q 'matchName: "pkg-npm.githubusercontent.com"' <<<"$package_policy"
+if rg -q 'pkg-npm.githubusercontent.com' <<<"$package_sandbox"; then
+  echo 'Sandbox policy directly allows package CDN' >&2
+  exit 1
+fi
+if helm template fixture "$chart" -f "$values" -f examples/packages-broker.yaml --set networkPolicy.toolDomains[0]=pkg-npm.githubusercontent.com >/dev/null 2>&1; then
+  echo 'Package CDN bypass unexpectedly allowed' >&2
+  exit 1
+fi
+if rg -q matchPattern <<<"$package_policy"; then
+  echo 'Exact package host policy rendered wildcard rule' >&2
+  exit 1
+fi
