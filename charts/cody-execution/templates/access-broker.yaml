@@ -19,6 +19,9 @@
 {{- if not (or (eq $broker.networkPolicy.provider "none") (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
 {{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
 {{- end -}}
+{{- if and $broker.tools.enabled (eq $broker.networkPolicy.provider "none") -}}
+{{- fail "Tools broker requires Cilium or acknowledged external network enforcement; provider none is not supported" -}}
+{{- end -}}
 {{- if and $broker.github.enabled (not $broker.github.upstreamHosts) -}}{{- fail "GitHub broker requires connector-derived upstreamHosts" -}}{{- end -}}
 {{- if and $broker.packages.enabled (not $broker.packages.upstreamHosts) -}}{{- fail "Package broker requires registry upstreamHosts" -}}{{- end -}}
 {{- if and $broker.tools.enabled (not (or $broker.tools.externalEndpoints $broker.tools.internalEndpoints)) -}}{{- fail "Tools broker requires explicit externalEndpoints or internalEndpoints" -}}{{- end -}}

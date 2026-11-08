@@ -324,3 +324,16 @@ if rg -q 'resources:.*secrets|verbs:.*\*' <<<"$tools_role"; then
 fi
 tools_service="$(awk 'BEGIN { RS="---" } /kind: Service[[:space:]]/ && /name: fixture-broker-tools/ { print }' <<<"$tools")"
 rg -q 'sessionAffinity: ClientIP' <<<"$tools_service"
+
+for invalid in 'accessBroker.networkPolicy.provider=none,networkPolicy.enabled=false' 'accessBroker.networkPolicy.provider=none,accessBroker.networkPolicy.externalEnforcementConfigured=true' 'accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.networkPolicy.provider=cilium,networkPolicy.enabled=false'; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Tools broker rendered without acknowledged network isolation: $invalid" >&2
+    exit 1
+  fi
+done
+tools_external="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'networkPolicy.enabled=false,accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=true')"
+rg -q -- '--mode=tools' <<<"$tools_external"
+if rg -q 'kind: CiliumNetworkPolicy' <<<"$tools_external"; then
+  echo 'External tools enforcement rendered Cilium policies' >&2
+  exit 1
+fi
