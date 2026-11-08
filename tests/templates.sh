@@ -213,41 +213,39 @@ if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --
   exit 1
 fi
 
-downloads="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.downloadHosts={Artifacts.Example.com,downloads.example.com}')"
-rg -q -- '--github-download-hosts=artifacts.example.com,downloads.example.com' <<<"$downloads"
-test "$(rg -c -- '--github-download-hosts=' <<<"$downloads")" = 1
-broker_policy="$(awk 'BEGIN { RS="---" } /name: fixture-github-broker/ { print }' <<<"$downloads")"
-for host in artifacts.example.com downloads.example.com; do
-  test "$(rg -c -F "\"$host\"" <<<"$broker_policy")" = 3
+broker_policy="$(awk 'BEGIN { RS="---" } /name: fixture-github-broker/ { print }' <<<"$github")"
+for domain in codeload.github.com '*.githubusercontent.com' '*.blob.core.windows.net'; do
+  test "$(rg -c -F "\"$domain\"" <<<"$broker_policy")" = 3
 done
-sandbox_policy="$(awk 'BEGIN { RS="---" } /name: fixture-sandbox-egress/ { print }' <<<"$downloads")"
-if rg -q 'artifacts.example.com|downloads.example.com' <<<"$sandbox_policy"; then
-  echo 'Download host unexpectedly granted sandbox egress' >&2
+rg -q -F 'matchName: "codeload.github.com"' <<<"$broker_policy"
+rg -q -F 'matchPattern: "*.githubusercontent.com"' <<<"$broker_policy"
+rg -q -F 'matchPattern: "*.blob.core.windows.net"' <<<"$broker_policy"
+sandbox_policy="$(awk 'BEGIN { RS="---" } /name: fixture-sandbox-egress/ { print }' <<<"$github")"
+if rg -q 'codeload.github.com|githubusercontent.com|blob.core.windows.net' <<<"$sandbox_policy"; then
+  echo 'Managed download domain unexpectedly granted sandbox egress' >&2
   exit 1
 fi
 if rg -q -- '--github-download-hosts=' <<<"$github"; then
-  echo 'Default configuration unexpectedly enables external downloads' >&2
+  echo 'Removed download configuration flag rendered' >&2
   exit 1
 fi
-for invalid in '*.example.com' 'https://example.com' 'example.com:443' '127.0.0.1' '::1' '127.1' '2130706433' ' example.com' 'example.com.' 'bad..example.com' '{example.com,EXAMPLE.com}'; do
-  if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set "accessBroker.github.downloadHosts[0]=$invalid" >/dev/null 2>&1; then
-    echo "Invalid download host rendered: $invalid" >&2
+for setting in 'accessBroker.github.downloadHosts=["blob.example.com"]' 'accessBroker.github.downloadHosts=[]'; do
+  if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set-json "$setting" >/dev/null 2>&1; then
+    echo 'Removed download host configuration accepted' >&2
     exit 1
   fi
 done
-if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.downloadHosts={example.com,EXAMPLE.com}' >/dev/null 2>&1; then
-  echo 'Case-equivalent duplicate download host rendered' >&2
-  exit 1
-fi
-if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.downloadHosts={Downloads.Example.com}' --set 'networkPolicy.toolDomains[0]=downloads.example.com' >/dev/null 2>&1; then
-  echo 'Download host sandbox bypass rendered' >&2
-  exit 1
-fi
-external_downloads="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.github.downloadHosts={downloads.example.com}' --set 'accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=true,networkPolicy.enabled=false')"
-rg -q -- '--github-download-hosts=downloads.example.com' <<<"$external_downloads"
+for domain in codeload.github.com objects.githubusercontent.com OBJECTS.GITHUBUSERCONTENT.COM productionresultssa19.blob.core.windows.net productionresultssa98.blob.core.windows.net '*.githubusercontent.com' '*.github.com'; do
+  for provider in cilium external; do
+    if helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set "networkPolicy.toolDomains[0]=$domain" --set "accessBroker.networkPolicy.provider=$provider,accessBroker.networkPolicy.externalEnforcementConfigured=true" >/dev/null 2>&1; then
+      echo "Sandbox bypass of managed download domain rendered: $domain" >&2
+      exit 1
+    fi
+  done
+done
+external_downloads="$(helm template fixture "$chart" -f "$values" -f examples/github-broker.yaml --set 'accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=true,networkPolicy.enabled=false')"
 if rg -q 'kind: CiliumNetworkPolicy' <<<"$external_downloads"; then
   echo 'External enforcement mode unexpectedly emits Cilium policies' >&2
   exit 1
 fi
 rg -q -F "!('actions' in self) || self.actions == 'read'" charts/cody-execution/crds/accessprofiles.yaml
-printf '%s\n' "$downloads" | validate_documents

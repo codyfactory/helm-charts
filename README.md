@@ -228,20 +228,32 @@ repository zip/tar archives, Actions run/job logs, Actions artifact zip download
 and release assets requested as `application/octet-stream`. The broker follows at
 most five redirects under the same live lease and strips authentication from
 redirected blob requests. It exposes neither signed redirect URLs nor download
-credentials to the sandbox. Other raw/diff/binary metadata modes remain unsupported.
+credentials to the sandbox. Actual plain-text and GitHub diff/patch/raw media responses stream too, as does
+HTML from the Markdown rendering endpoints. Negotiated raw contents/blob GETs
+support binary bodies and managed download redirects. Actual JSON/+json responses
+remain bounded and sanitized regardless of the requested representation; other
+binary modes remain limited to the supported download operations.
 API request bodies remain unchanged and are not parsed into a second permission
 matrix. Include these response limits in native-client acceptance after upgrades.
 
-Configure `accessBroker.github.downloadHosts` with the exact DNS names used by
-these downloads. Its default `[]` disables external redirect following. The same
-normalized list becomes `--github-download-hosts` and broker-only DNS/FQDN/SNI
-Cilium egress rules. Names are case-insensitive; duplicate names, IP addresses,
-ports, URLs and wildcards are rejected. Do not add these hosts to sandbox
-`networkPolicy.toolDomains`. With external enforcement, configure equivalent
-broker-only HTTPS egress to the exact download hosts and retain sandbox denial
-before setting `externalEnforcementConfigured`. The list is an operator network
-allowance, not a repository grant; the initiating API request still uses the
-lease's scoped token. Restrict the list to the provider's actual download hosts.
+Cody owns the supported public-GitHub download domains: `codeload.github.com`,
+`*.githubusercontent.com` and `*.blob.core.windows.net`. No operator hostname
+setting or download-host flag is supported. The broker and chart ship this policy
+together; rotating Azure storage accounts need no per-account configuration.
+Each `*.` matches one DNS label, not the domain itself or nested subdomains.
+The chart uses DNS/FQDN `matchPattern` and TLS `serverNames` for these patterns,
+consistent with [Cilium's DNS matching](https://docs.cilium.io/en/stable/security/policy/layer3/#dns-based)
+and [SNI pattern semantics](https://github.com/cilium/cilium/blob/main/pkg/policy/api/l4.go).
+Use a Cilium version with that SNI pattern support; rendering is not live enforcement proof.
+
+Azure Blob Storage is shared infrastructure, not a GitHub-owned domain. Cody
+follows only backend redirects from supported, authenticated GitHub API GETs,
+without provider credentials on blob hops. These domains are broker-only network
+allowances, never sandbox egress grants. Sandbox tool-domain overlap is rejected.
+External enforcement must supply equivalent broker-only HTTPS policy and retain
+sandbox denial before setting `externalEnforcementConfigured`. Existing connector
+`upstreamHosts` configuration is unchanged. Additional enterprise download
+backends require Cody policy support; there is no ad hoc hostname override.
 
 Reviews require the broker too. Without a selected AccessProfile, an authorized
 review lease grants repository-wide contents reads to both checkout preparation

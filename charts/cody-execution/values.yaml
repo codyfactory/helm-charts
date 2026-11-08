@@ -63,4 +63,3 @@ accessBroker:
   github:
     enabled: false
     upstreamHosts: []
-    downloadHosts: []

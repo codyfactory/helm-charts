@@ -1,9 +1,18 @@
 {{- if .Values.accessBroker.github.enabled }}
 {{- $githubHosts := list }}
-{{- range concat .Values.accessBroker.github.upstreamHosts (include "cody.githubDownloadHosts" . | fromJsonArray) }}
+{{- range concat .Values.accessBroker.github.upstreamHosts (include "cody.githubDownloadDomains" . | fromJsonArray) }}
 {{- $githubHosts = append $githubHosts (lower .) }}
 {{- end }}
 {{- range .Values.networkPolicy.toolDomains }}
+{{- $tool := lower . }}
+{{- if contains "*" $tool }}
+{{- fail "Brokered GitHub sandbox tool domains must not contain wildcards" }}
+{{- end }}
+{{- range $host := $githubHosts }}
+{{- if and (hasPrefix "*." $host) (regexMatch (printf "^[^.]+\\.%s$" (regexQuoteMeta (trimPrefix "*." $host))) $tool) }}
+{{- fail "Brokered GitHub download domains must not appear in networkPolicy.toolDomains" }}
+{{- end }}
+{{- end }}
 {{- if or (has (lower .) $githubHosts) (eq (lower .) "github.com") (eq (lower .) "api.github.com") }}
 {{- fail "Brokered GitHub hosts must not appear in networkPolicy.toolDomains" }}
 {{- end }}
