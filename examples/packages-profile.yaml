@@ -1,0 +1,22 @@
+apiVersion: execution.cody.so/v1alpha1
+kind: AccessProfile
+metadata:
+  name: package-reader
+spec:
+  packageRegistries:
+    - name: github-packages
+      endpoints:
+        - https://npm.pkg.github.com/
+      auth:
+        bearer:
+          secretRef:
+            name: github-packages-reader
+            key: token
+    - name: npm-private
+      endpoints:
+        - https://registry.npmjs.org/
+      auth:
+        bearer:
+          secretRef:
+            name: npm-reader
+            key: token

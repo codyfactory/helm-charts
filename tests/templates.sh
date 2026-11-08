@@ -257,3 +257,26 @@ if rg -q 'kind: CiliumNetworkPolicy' <<<"$unenforced"; then
 fi
 rg -q 'name: fixture-broker-github' <<<"$unenforced"
 rg -q 'maxLength: 65536' "$chart/crds/agents.yaml"
+
+packages="$(helm template fixture "$chart" -f "$values" -f examples/packages-broker.yaml --include-crds)"
+rg -q -- '--mode=packages' <<<"$packages"
+rg -q -- '--package-registry-broker-service-account=default/fixture-broker-packages' <<<"$packages"
+rg -q '"packageRegistryEndpoint":"https://fixture-broker-packages.default.svc.cluster.local"' <<<"$packages"
+rg -q 'name: fixture-packages-broker' <<<"$packages"
+printf '%s\n' "$packages" | validate_documents
+package_policy="$(awk 'BEGIN { RS="---" } /name: fixture-packages-broker/ { print }' <<<"$packages")"
+rg -q 'matchName: "npm.pkg.github.com"' <<<"$package_policy"
+package_sandbox="$(awk 'BEGIN { RS="---" } /name: fixture-sandbox-egress/ { print }' <<<"$packages")"
+if rg -q 'npm.pkg.github.com|registry.npmjs.org' <<<"$package_sandbox"; then
+  echo 'Sandbox policy directly allows package registries' >&2
+  exit 1
+fi
+for invalid in 'accessBroker.enabled=false' 'accessBroker.packages.upstreamHosts={}' 'networkPolicy.toolDomains[0]=npm.pkg.github.com' 'networkPolicy.toolDomains[0]=NPM.PKG.GITHUB.COM'; do
+  if helm template fixture "$chart" -f "$values" -f examples/packages-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid package broker configuration rendered: $invalid" >&2
+    exit 1
+  fi
+done
+mixed_packages="$(helm template fixture "$chart" -f "$values" -f examples/packages-broker.yaml -f examples/github-broker.yaml --set accessBroker.azure.enabled=true,accessBroker.issuerRef.name=issuer,accessBroker.tlsSecret=,accessBroker.feedTLSSecret=,accessBroker.caSecret=ca)"
+rg -q 'fixture-broker-packages.default.svc.cluster.local' <<<"$mixed_packages"
+printf '%s\n' "$mixed_packages" | validate_documents

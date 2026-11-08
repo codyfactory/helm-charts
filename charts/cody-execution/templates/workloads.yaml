@@ -65,8 +65,11 @@ spec:
             {{- if $.Values.accessBroker.github.enabled }}
             - --github-broker-service-account={{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-github
             {{- end }}
+            {{- if $.Values.accessBroker.packages.enabled }}
+            - --package-registry-broker-service-account={{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-packages
+            {{- end }}
             - --broker-audience={{ $.Values.accessBroker.audience }}
-            - --broker-service-accounts={{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-kubernetes{{ if $.Values.accessBroker.github.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-github{{ end }}{{ if $.Values.accessBroker.azure.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-azure{{ end }}
+            - --broker-service-accounts={{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-kubernetes{{ if $.Values.accessBroker.github.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-github{{ end }}{{ if $.Values.accessBroker.packages.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-packages{{ end }}{{ if $.Values.accessBroker.azure.enabled }},{{ $.Release.Namespace }}/{{ $.Release.Name }}-broker-azure{{ end }}
             {{- end }}
             - --protected-secrets
             - {{ printf "%s,%s,%s,%s,%s" $installationToken $token $.Values.gatewayCASecret $brokerTLS $feedTLS | quote }}
