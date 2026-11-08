@@ -1,0 +1,21 @@
+networkPolicy:
+  enabled: true
+accessBroker:
+  enabled: true
+  transport:
+    mode: tls
+  tlsSecret: cody-broker-tls
+  feedTLSSecret: cody-broker-feed-tls
+  networkPolicy:
+    provider: cilium
+  tools:
+    enabled: true
+    externalEndpoints:
+      - host: mcp.datadoghq.eu
+        port: 443
+    internalEndpoints:
+      - host: cody-tools.tools.svc.cluster.local
+        namespace: tools
+        podSelector:
+          app: cody-tools
+        port: 8080

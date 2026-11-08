@@ -1,3 +1,10 @@
+{{- if .Values.accessBroker.tools.enabled }}
+{{- $hosts := list }}
+{{- range concat .Values.accessBroker.tools.externalEndpoints .Values.accessBroker.tools.internalEndpoints }}{{- $hosts = append $hosts (lower .host) }}{{- end }}
+{{- range .Values.networkPolicy.toolDomains }}
+{{- if has (lower .) $hosts }}{{- fail "Toolbox hosts must not appear in networkPolicy.toolDomains" }}{{- end }}
+{{- end }}
+{{- end }}
 {{- if and .Values.accessBroker.packages.enabled (ne .Values.accessBroker.networkPolicy.provider "none") }}
 {{- $hosts := list }}
 {{- range concat .Values.accessBroker.packages.upstreamHosts (include "cody.packageDownloadHosts" . | fromJsonArray) }}{{- $hosts = append $hosts (lower .) }}{{- end }}
@@ -62,6 +69,9 @@ spec:
               {{- if .Values.accessBroker.github.enabled }}
               - matchName: {{ printf "%s-broker-github.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- end }}
+              {{- if .Values.accessBroker.tools.enabled }}
+              - matchName: {{ printf "%s-broker-tools.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- end }}
               {{- if .Values.accessBroker.packages.enabled }}
               - matchName: {{ printf "%s-broker-packages.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- end }}
@@ -104,6 +114,15 @@ spec:
         - matchLabels:
             app: {{ .Release.Name }}-broker-github
             k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+    {{- end }}
+    {{- if .Values.accessBroker.tools.enabled }}
+    - toEndpoints:
+        - matchLabels:
+            app: {{ .Release.Name }}-broker-tools
       toPorts:
         - ports:
             - port: "8443"

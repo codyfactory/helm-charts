@@ -1,0 +1,75 @@
+{{- if and .Values.accessBroker.enabled .Values.accessBroker.tools.enabled (eq .Values.accessBroker.networkPolicy.provider "cilium") }}
+{{- $endpoints := concat .Values.accessBroker.tools.externalEndpoints .Values.accessBroker.tools.internalEndpoints }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-tools-broker
+spec:
+  endpointSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-broker-tools
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+          matchExpressions:
+            - key: cody.so/sandbox
+              operator: Exists
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchName: {{ printf "%s-broker-feed.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- range $endpoints }}
+              - matchName: {{ lower .host | quote }}
+              {{- end }}
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+            app: {{ .Release.Name }}-execution-plane
+      toPorts:
+        - ports:
+            - port: "8444"
+              protocol: TCP
+    - toEntities: [kube-apiserver]
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "6443"
+              protocol: TCP
+    {{- range .Values.accessBroker.tools.externalEndpoints }}
+    - toFQDNs:
+        - matchName: {{ lower .host | quote }}
+      toPorts:
+        - ports:
+            - port: {{ .port | quote }}
+              protocol: TCP
+    {{- end }}
+    {{- range .Values.accessBroker.tools.internalEndpoints }}
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: {{ .namespace | quote }}
+            {{- range $key, $value := .podSelector }}
+            {{ $key | quote }}: {{ $value | quote }}
+            {{- end }}
+      toPorts:
+        - ports:
+            - port: {{ .port | quote }}
+              protocol: TCP
+    {{- end }}
+{{- end }}

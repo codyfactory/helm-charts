@@ -294,3 +294,25 @@ if rg -q matchPattern <<<"$package_policy"; then
   echo 'Exact package host policy rendered wildcard rule' >&2
   exit 1
 fi
+tools="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --include-crds)"
+rg -q -- '--mode=tools' <<<"$tools"
+rg -q -- '--tools-broker-service-account=default/fixture-broker-tools' <<<"$tools"
+rg -q '"toolsEndpoint":"https://fixture-broker-tools.default.svc.cluster.local"' <<<"$tools"
+rg -q 'sessionAffinity: ClientIP' <<<"$tools"
+printf '%s\n' "$tools" | validate_documents
+tools_policy="$(awk 'BEGIN { RS="---" } /name: fixture-tools-broker/ { print }' <<<"$tools")"
+rg -q 'mcp.datadoghq.eu' <<<"$tools_policy"
+rg -q 'port: "8080"' <<<"$tools_policy"
+rg -q 'k8s:io.kubernetes.pod.namespace: "tools"' <<<"$tools_policy"
+tools_deployment="$(awk 'BEGIN { RS="---" } /kind: Deployment/ && /name: fixture-broker-tools/ { print }' <<<"$tools")"
+rg -q -- '--transport-mode=tls' <<<"$tools_deployment"
+if rg -q 'datadog-mcp-headers|headersSecretRef' <<<"$tools_deployment"; then
+  echo 'Toolbox upstream credentials must not be mounted in broker' >&2
+  exit 1
+fi
+for invalid in 'accessBroker.enabled=false' 'accessBroker.tools.externalEndpoints={},accessBroker.tools.internalEndpoints={}' 'networkPolicy.toolDomains[0]=mcp.datadoghq.eu' 'networkPolicy.toolDomains[0]=CODY-TOOLS.TOOLS.SVC.CLUSTER.LOCAL' 'accessBroker.tools.internalEndpoints[0].port=0'; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid tools broker configuration rendered: $invalid" >&2
+    exit 1
+  fi
+done

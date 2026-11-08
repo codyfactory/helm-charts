@@ -66,3 +66,7 @@ accessBroker:
   packages:
     enabled: false
     upstreamHosts: []
+  tools:
+    enabled: false
+    externalEndpoints: []
+    internalEndpoints: []

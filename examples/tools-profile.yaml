@@ -1,0 +1,22 @@
+apiVersion: execution.cody.so/v1alpha1
+kind: AccessProfile
+metadata:
+  name: sre-tools
+spec:
+  toolboxes:
+    - name: datadog
+      endpoint: https://mcp.datadoghq.eu/v1/mcp?toolsets=core
+      auth:
+        headersSecretRef:
+          name: datadog-mcp-headers
+      tools:
+        prefixes: [get_, list_, search_]
+      onUnavailable: continue
+    - name: cody-tools
+      endpoint: http://cody-tools.tools.svc.cluster.local:8080/mcp
+      allowPlaintext: true
+      auth:
+        anonymous: {}
+      tools:
+        names: [query]
+      onUnavailable: continue
