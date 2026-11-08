@@ -284,3 +284,57 @@ installation before treating the deployment as ready.
 On Calico or another cluster without Cilium, explicitly set `accessBroker.networkPolicy.provider: none` and `networkPolicy.enabled: false` to run the broker without chart-enforced egress containment. Credential authorization and tenant checks remain enabled. This mode does not prevent sandbox bypass of the broker through other network paths. Defaults still require an enforcement choice; `external` continues to require confirmation of external enforcement.
 
 Agent `agentsMD` accepts up to 65,536 characters. Skill names may contain colon-separated namespace segments, for example `alpheya:create-pr`; reference-input names retain their existing syntax.
+
+## Package registry broker
+
+The package-registry source candidate adds `accessBroker.packages.enabled` and
+`AccessProfile.spec.packageRegistries`. Deploy matching controller, broker and
+runtime images before enabling it. Apply the updated CRD first. The chart does
+not install package-manager binaries into Agent images or provision upstream
+credentials.
+
+`examples/packages-broker.yaml` configures the dedicated broker and its Cilium
+network policy. `upstreamHosts` is the installation firewall allowlist; profile
+endpoint roots independently authorize each lease. Include every configured
+registry/download host in that firewall list. GitHub Packages automatically adds
+`pkg-npm.githubusercontent.com` as a redirect-only download host; operators do
+not need to add it as an endpoint or firewall entry. The sandbox must not have direct
+egress to these hosts; the chart rejects overlapping `networkPolicy.toolDomains`
+when enforcement is enabled. External policies must provide equivalent isolation.
+
+`examples/packages-profile.yaml` shows two registries with different credentials.
+Each entry contains a unique `name`, nonoverlapping HTTPS `endpoints`, and exactly
+one of `auth.bearer.secretRef: {name, key}` or
+`auth.basic: {secretRef: {name}, usernameKey, passwordKey}`. All Secret references
+resolve in the Agent namespace. Basic Secret values are the raw username and
+password/PAT, not an already encoded Authorization header. Provision Secrets
+separately through the operator's normal secret-management mechanism. Only the
+controller reads them; package broker Pods receive neither Secret mounts nor
+Secret-read RBAC.
+
+The initial transport is download-only (GET/HEAD). It preserves original registry
+URLs and lockfiles, including scoped package paths. Credentialed roots belong in
+`endpoints`; custom credential-free CDN hosts belong in `downloadHosts` and the
+installation firewall list. Download hosts are reachable only through redirects,
+never directly through the sandbox forwarder. Redirects must stay within the
+selected grant's endpoints or download hosts; credentials are stripped on crossing
+origins and never restored later in that chain. Package publishing, automatic OAuth login and arbitrary CDN destinations
+are unsupported. Add only verified endpoint roots; granting a hostname does not
+restrict individual packages under that root. Upstream credential permissions
+remain the package authorization boundary. Registry Secrets are reserved from
+Agent `credentialRef`, including across Agents. Missing authentication keys mark
+the profile unavailable.
+
+The broker coalesces credential acquisition and caches it per lease and frozen
+registry grant for up to 30 seconds, bounded by lease expiry. Same-UID Secret data
+rotation becomes visible on the next acquisition; lease and Pod authorization
+still run for every request. Native clients receive a non-secret
+`NODE_AUTH_TOKEN` placeholder for existing `.npmrc` interpolation.
+
+Private Go modules fetched from GitHub use the existing GitHub repository grant,
+not a package-registry PAT. Grant every private dependency repository, configure
+`GOPRIVATE` and related private-resolution settings, and supply the required Go
+compiler and public dependency connectivity. A private Go module proxy is a
+separate HTTP registry use case. Native-client fixture results are recorded in
+the code repository; chart rendering alone does not establish live acceptance
+for GitHub Packages, GitLab, npm or Azure Artifacts.

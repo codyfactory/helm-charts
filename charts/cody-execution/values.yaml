@@ -63,3 +63,6 @@ accessBroker:
   github:
     enabled: false
     upstreamHosts: []
+  packages:
+    enabled: false
+    upstreamHosts: []

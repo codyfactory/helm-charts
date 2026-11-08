@@ -1,3 +1,12 @@
+{{- if and .Values.accessBroker.packages.enabled (ne .Values.accessBroker.networkPolicy.provider "none") }}
+{{- $hosts := list }}
+{{- range concat .Values.accessBroker.packages.upstreamHosts (include "cody.packageDownloadHosts" . | fromJsonArray) }}{{- $hosts = append $hosts (lower .) }}{{- end }}
+{{- range .Values.networkPolicy.toolDomains }}
+{{- if or (contains "*" .) (has (lower .) $hosts) }}
+{{- fail "Package registry hosts must not appear in networkPolicy.toolDomains" }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if and .Values.accessBroker.github.enabled (ne .Values.accessBroker.networkPolicy.provider "none") }}
 {{- $githubHosts := list }}
 {{- range concat .Values.accessBroker.github.upstreamHosts (include "cody.githubDownloadDomains" . | fromJsonArray) }}
@@ -53,6 +62,9 @@ spec:
               {{- if .Values.accessBroker.github.enabled }}
               - matchName: {{ printf "%s-broker-github.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- end }}
+              {{- if .Values.accessBroker.packages.enabled }}
+              - matchName: {{ printf "%s-broker-packages.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
+              {{- end }}
               {{- if .Values.accessBroker.azure.enabled }}
               - matchName: {{ printf "%s-broker-azure.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               - matchName: management.azure.com
@@ -91,6 +103,16 @@ spec:
     - toEndpoints:
         - matchLabels:
             app: {{ .Release.Name }}-broker-github
+            k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+    {{- end }}
+    {{- if .Values.accessBroker.packages.enabled }}
+    - toEndpoints:
+        - matchLabels:
+            app: {{ .Release.Name }}-broker-packages
             k8s:io.kubernetes.pod.namespace: {{ .Release.Namespace }}
       toPorts:
         - ports:

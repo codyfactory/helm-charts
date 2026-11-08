@@ -23,7 +23,7 @@ spec:
             spec:
               type: object
               x-kubernetes-validations:
-                - rule: has(self.kubernetes) || has(self.github)
+                - rule: has(self.kubernetes) || has(self.github) || has(self.packageRegistries)
                   message: At least one supported access block is required
                 - rule: '!has(self.azure) || has(self.kubernetes)'
                   message: Azure requires a Kubernetes ServiceAccount
@@ -57,6 +57,59 @@ spec:
                           message: Only Cody contents, pull_requests and actions capabilities are supported
                         - rule: "!('actions' in self) || self.actions == 'read'"
                           message: Actions capability supports read only
+                packageRegistries:
+                  type: array
+                  minItems: 1
+                  maxItems: 32
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys: [name]
+                  items:
+                    type: object
+                    required: [name, endpoints, auth]
+                    properties:
+                      name: {type: string, minLength: 1, maxLength: 63}
+                      endpoints:
+                        type: array
+                        minItems: 1
+                        maxItems: 32
+                        x-kubernetes-list-type: set
+                        items: {type: string, minLength: 1, maxLength: 2048, pattern: '^https://'}
+                      downloadHosts:
+                        type: array
+                        maxItems: 32
+                        x-kubernetes-list-type: set
+                        items:
+                          type: string
+                          minLength: 1
+                          maxLength: 253
+                          pattern: '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$'
+                      auth:
+                        type: object
+                        x-kubernetes-validations:
+                          - rule: has(self.bearer) != has(self.basic)
+                            message: Exactly one of bearer or basic authentication is required
+                        properties:
+                          bearer:
+                            type: object
+                            required: [secretRef]
+                            properties:
+                              secretRef:
+                                type: object
+                                required: [name, key]
+                                properties:
+                                  name: {type: string, minLength: 1, maxLength: 253}
+                                  key: {type: string, minLength: 1}
+                          basic:
+                            type: object
+                            required: [secretRef, usernameKey, passwordKey]
+                            properties:
+                              secretRef:
+                                type: object
+                                required: [name]
+                                properties:
+                                  name: {type: string, minLength: 1, maxLength: 253}
+                              usernameKey: {type: string, minLength: 1}
+                              passwordKey: {type: string, minLength: 1}
                 azure:
                   type: object
                   required: [tenantID, clientID, allowedResources]

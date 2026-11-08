@@ -22,6 +22,9 @@ spec:
     {{- if $.Values.accessBroker.github.enabled }}
     - {{ printf "%s-broker-github.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
     {{- end }}
+    {{- if $.Values.accessBroker.packages.enabled }}
+    - {{ printf "%s-broker-packages.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
+    {{- end }}
     {{- if $.Values.accessBroker.azure.enabled }}
     - {{ printf "%s-broker-azure.%s.svc.cluster.local" $.Release.Name $.Release.Namespace | quote }}
     {{- end }}

@@ -1,0 +1,15 @@
+networkPolicy:
+  enabled: true
+accessBroker:
+  enabled: true
+  transport:
+    mode: tls
+  tlsSecret: cody-broker-tls
+  feedTLSSecret: cody-broker-feed-tls
+  networkPolicy:
+    provider: cilium
+  packages:
+    enabled: true
+    upstreamHosts:
+      - npm.pkg.github.com
+      - registry.npmjs.org
