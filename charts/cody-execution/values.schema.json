@@ -29,7 +29,8 @@
               "type": "object",
               "required": [
                 "cpu",
-                "memory"
+                "memory",
+                "ephemeral-storage"
               ],
               "properties": {
                 "cpu": {
@@ -40,6 +41,13 @@
                   "minLength": 1
                 },
                 "memory": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minLength": 1
+                },
+                "ephemeral-storage": {
                   "type": [
                     "string",
                     "number"
@@ -52,7 +60,8 @@
               "type": "object",
               "required": [
                 "cpu",
-                "memory"
+                "memory",
+                "ephemeral-storage"
               ],
               "properties": {
                 "cpu": {
@@ -63,6 +72,13 @@
                   "minLength": 1
                 },
                 "memory": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minLength": 1
+                },
+                "ephemeral-storage": {
                   "type": [
                     "string",
                     "number"
@@ -82,6 +98,47 @@
           "type": "string",
           "maxLength": 253,
           "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "",
+                  "Exists",
+                  "Equal"
+                ]
+              },
+              "value": {
+                "type": "string"
+              },
+              "effect": {
+                "type": "string",
+                "enum": [
+                  "",
+                  "NoSchedule",
+                  "PreferNoSchedule",
+                  "NoExecute"
+                ]
+              },
+              "tolerationSeconds": {
+                "type": "integer"
+              }
+            }
+          }
         }
       },
       "additionalProperties": false

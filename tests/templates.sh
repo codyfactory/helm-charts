@@ -367,3 +367,27 @@ done
 tools_capacity="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'accessBroker.tools.maxScopes=20,accessBroker.tools.maxScopesPerLease=5')"
 rg -q -- '--tools-max-scopes=20' <<<"$tools_capacity"
 rg -q -- '--tools-max-scopes-per-lease=5' <<<"$tools_capacity"
+
+assert_sandbox_argument() {
+  local manifest="$1" flag="$2" expected="$3" actual
+  actual="$(awk -v flag="$flag" '$0 ~ " - " flag "$" { getline; sub(/^[[:space:]]*- /, ""); print }' <<<"$manifest")"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "Unexpected value for $flag: $actual (expected $expected)" >&2
+    exit 1
+  fi
+}
+assert_sandbox_argument "$rendered" --sandbox-node-selector '"{}"'
+assert_sandbox_argument "$rendered" --sandbox-tolerations '"[]"'
+assert_sandbox_argument "$rendered" --sandbox-ephemeral-storage-request '"1Gi"'
+assert_sandbox_argument "$rendered" --sandbox-ephemeral-storage-limit '"2Gi"'
+placement="$(helm template fixture "$chart" -f "$values" --set-json 'sandbox.nodeSelector={"pool":"reviews"}' --set-json 'sandbox.tolerations=[{"key":"reviews","operator":"Exists","effect":"NoSchedule"}]' --set 'sandbox.resources.requests.ephemeral-storage=3Gi,sandbox.resources.limits.ephemeral-storage=6Gi')"
+assert_sandbox_argument "$placement" --sandbox-node-selector '"{\"pool\":\"reviews\"}"'
+assert_sandbox_argument "$placement" --sandbox-tolerations '"[{\"effect\":\"NoSchedule\",\"key\":\"reviews\",\"operator\":\"Exists\"}]"'
+assert_sandbox_argument "$placement" --sandbox-ephemeral-storage-request '"3Gi"'
+assert_sandbox_argument "$placement" --sandbox-ephemeral-storage-limit '"6Gi"'
+for invalid in 'sandbox.nodeSelector={"pool":2}' 'sandbox.tolerations={}' 'sandbox.tolerations=[{"operator":"Invalid"}]'; do
+  if helm template fixture "$chart" -f "$values" --set-json "$invalid" >/dev/null 2>&1; then
+    echo "Invalid placement unexpectedly rendered: $invalid" >&2
+    exit 1
+  fi
+done
