@@ -399,10 +399,10 @@ back to an engine that does not understand these fields.
 
 The 0.6.3 source candidate wires installation defaults through `sandbox.nodeSelector`,
 `sandbox.tolerations`, and `sandbox.resources.requests.ephemeral-storage` /
-`sandbox.resources.limits.ephemeral-storage`. Select an execution image containing
-[cody#84](https://github.com/codyfactory/cody/pull/84) before installing this candidate:
-the current default image predates these flags. Publish a compatible immutable image
-and update the default digest before publishing this chart version.
+`sandbox.resources.limits.ephemeral-storage`. The default execution and onboarding images are pinned to compatible
+`docker.io/donchev7` digests built from
+[cody#84 at f59d65e5](https://github.com/codyfactory/cody/commit/f59d65e581c70f6636192684e990fc8646951f43).
+The chart remains a source candidate until its package is published.
 
 An Agent's present sandbox setting replaces its installation default as a whole,
 including empty maps and lists. The chart's default selector and tolerations are empty.
