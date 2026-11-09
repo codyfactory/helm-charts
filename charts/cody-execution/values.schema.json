@@ -479,6 +479,156 @@
               }
             }
           }
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "externalEndpoints",
+            "internalEndpoints",
+            "maxScopes",
+            "maxScopesPerLease"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "externalEndpoints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "host",
+                  "port"
+                ],
+                "properties": {
+                  "host": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                }
+              }
+            },
+            "internalEndpoints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "host",
+                  "port",
+                  "namespace",
+                  "podSelector"
+                ],
+                "properties": {
+                  "host": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "podSelector": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "resources": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "requests": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "cpu",
+                    "memory"
+                  ],
+                  "properties": {
+                    "cpu": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "memory": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "limits": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "cpu",
+                    "memory"
+                  ],
+                  "properties": {
+                    "cpu": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "memory": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            },
+            "maxScopes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxScopesPerLease": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              },
+              "then": {
+                "required": [
+                  "resources"
+                ],
+                "properties": {
+                  "resources": {
+                    "required": [
+                      "requests",
+                      "limits"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     }

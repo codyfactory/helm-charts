@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cody-tools-broker-only
+  namespace: tools
+spec:
+  podSelector:
+    matchLabels:
+      app: cody-tools
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cody
+          podSelector:
+            matchLabels:
+              app: cody-broker-tools
+      ports:
+        - protocol: TCP
+          port: 8080

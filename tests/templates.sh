@@ -294,3 +294,76 @@ if rg -q matchPattern <<<"$package_policy"; then
   echo 'Exact package host policy rendered wildcard rule' >&2
   exit 1
 fi
+tools="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --include-crds)"
+rg -q -- '--mode=tools' <<<"$tools"
+rg -q -- '--tools-broker-service-account=default/fixture-broker-tools' <<<"$tools"
+rg -q '"toolsEndpoint":"https://fixture-broker-tools.default.svc.cluster.local"' <<<"$tools"
+rg -q 'sessionAffinity: ClientIP' <<<"$tools"
+printf '%s\n' "$tools" | validate_documents
+tools_policy="$(awk 'BEGIN { RS="---" } /name: fixture-tools-broker/ { print }' <<<"$tools")"
+rg -q 'mcp.datadoghq.eu' <<<"$tools_policy"
+rg -q 'port: "8080"' <<<"$tools_policy"
+rg -q 'k8s:io.kubernetes.pod.namespace: "tools"' <<<"$tools_policy"
+tools_deployment="$(awk 'BEGIN { RS="---" } /kind: Deployment/ && /name: fixture-broker-tools/ { print }' <<<"$tools")"
+rg -q -- '--transport-mode=tls' <<<"$tools_deployment"
+if rg -q 'datadog-mcp-headers|headersSecretRef' <<<"$tools_deployment"; then
+  echo 'Toolbox upstream credentials must not be mounted in broker' >&2
+  exit 1
+fi
+for invalid in 'accessBroker.enabled=false' 'accessBroker.tools.externalEndpoints={},accessBroker.tools.internalEndpoints={}' 'networkPolicy.toolDomains[0]=mcp.datadoghq.eu' 'networkPolicy.toolDomains[0]=CODY-TOOLS.TOOLS.SVC.CLUSTER.LOCAL' 'accessBroker.tools.internalEndpoints[0].port=0'; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid tools broker configuration rendered: $invalid" >&2
+    exit 1
+  fi
+done
+tools_role="$(awk 'BEGIN { RS="---" } /kind: Role/ && /name: fixture-broker-tools-pods/ { print }' <<<"$tools")"
+rg -q 'resources: \[pods, serviceaccounts\]' <<<"$tools_role"
+if rg -q 'resources:.*secrets|verbs:.*\*' <<<"$tools_role"; then
+  echo 'Tools broker must not have Secret-read or wildcard RBAC' >&2
+  exit 1
+fi
+tools_service="$(awk 'BEGIN { RS="---" } /kind: Service[[:space:]]/ && /name: fixture-broker-tools/ { print }' <<<"$tools")"
+rg -q 'sessionAffinity: ClientIP' <<<"$tools_service"
+
+for invalid in 'accessBroker.networkPolicy.provider=none,networkPolicy.enabled=false' 'accessBroker.networkPolicy.provider=none,accessBroker.networkPolicy.externalEnforcementConfigured=true' 'accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=false' 'accessBroker.networkPolicy.provider=cilium,networkPolicy.enabled=false'; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Tools broker rendered without acknowledged network isolation: $invalid" >&2
+    exit 1
+  fi
+done
+tools_external="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'networkPolicy.enabled=false,accessBroker.networkPolicy.provider=external,accessBroker.networkPolicy.externalEnforcementConfigured=true')"
+rg -q -- '--mode=tools' <<<"$tools_external"
+if rg -q 'kind: CiliumNetworkPolicy' <<<"$tools_external"; then
+  echo 'External tools enforcement rendered Cilium policies' >&2
+  exit 1
+fi
+
+rg -q 'cpu: 100m' <<<"$tools_deployment"
+rg -q 'memory: 512Mi' <<<"$tools_deployment"
+for key in requests.cpu requests.memory limits.cpu limits.memory; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "accessBroker.tools.resources.$key=null" >/dev/null 2>&1; then
+    echo "Tools broker rendered without resource bound: $key" >&2
+    exit 1
+  fi
+done
+if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set-json 'accessBroker.tools.resources={}' >/dev/null 2>&1; then
+  echo 'Tools broker rendered with empty resources' >&2
+  exit 1
+fi
+
+if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'networkPolicy.toolDomains[0]=MCP.DATADOGHQ.EU.' >/dev/null 2>&1; then
+  echo 'Trailing-dot toolbox host bypass unexpectedly allowed' >&2
+  exit 1
+fi
+
+rg -q -- '--tools-max-scopes=128' <<<"$tools_deployment"
+rg -q -- '--tools-max-scopes-per-lease=64' <<<"$tools_deployment"
+for invalid in 'accessBroker.tools.maxScopes=0' 'accessBroker.tools.maxScopesPerLease=0' 'accessBroker.tools.maxScopes=4,accessBroker.tools.maxScopesPerLease=5'; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid tools capacity rendered: $invalid" >&2
+    exit 1
+  fi
+done
+tools_capacity="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'accessBroker.tools.maxScopes=20,accessBroker.tools.maxScopesPerLease=5')"
+rg -q -- '--tools-max-scopes=20' <<<"$tools_capacity"
+rg -q -- '--tools-max-scopes-per-lease=5' <<<"$tools_capacity"

@@ -1,5 +1,5 @@
 {{- $broker := .Values.accessBroker -}}
-{{- if and (or $broker.azure.enabled $broker.github.enabled $broker.packages.enabled) (not $broker.enabled) -}}
+{{- if and (or $broker.azure.enabled $broker.github.enabled $broker.packages.enabled $broker.tools.enabled) (not $broker.enabled) -}}
 {{- fail "Optional brokers require accessBroker.enabled" -}}
 {{- end -}}
 {{- if $broker.enabled -}}
@@ -19,9 +19,15 @@
 {{- if not (or (eq $broker.networkPolicy.provider "none") (and (eq $broker.networkPolicy.provider "cilium") .Values.networkPolicy.enabled) (and (eq $broker.networkPolicy.provider "external") $broker.networkPolicy.externalEnforcementConfigured)) -}}
 {{- fail "Broker requires enabled Cilium enforcement or explicitly configured external equivalent enforcement" -}}
 {{- end -}}
+{{- if and $broker.tools.enabled (eq $broker.networkPolicy.provider "none") -}}
+{{- fail "Tools broker requires Cilium or acknowledged external network enforcement; provider none is not supported" -}}
+{{- end -}}
 {{- if and $broker.github.enabled (not $broker.github.upstreamHosts) -}}{{- fail "GitHub broker requires connector-derived upstreamHosts" -}}{{- end -}}
 {{- if and $broker.packages.enabled (not $broker.packages.upstreamHosts) -}}{{- fail "Package broker requires registry upstreamHosts" -}}{{- end -}}
+{{- if and $broker.tools.enabled (not (or $broker.tools.externalEndpoints $broker.tools.internalEndpoints)) -}}{{- fail "Tools broker requires explicit externalEndpoints or internalEndpoints" -}}{{- end -}}
+{{- if and $broker.tools.enabled (gt (int $broker.tools.maxScopesPerLease) (int $broker.tools.maxScopes)) -}}{{- fail "Tools maxScopesPerLease must not exceed maxScopes" -}}{{- end -}}
 {{- $modes := list "kubernetes" -}}
+{{- if $broker.tools.enabled -}}{{- $modes = append $modes "tools" -}}{{- end -}}
 {{- if $broker.packages.enabled -}}{{- $modes = append $modes "packages" -}}{{- end -}}
 {{- if $broker.github.enabled -}}{{- $modes = append $modes "github" -}}{{- end -}}
 {{- if $broker.azure.enabled -}}{{- $modes = append $modes "azure" -}}{{- end -}}
@@ -62,10 +68,18 @@ spec:
       containers:
         - name: broker
           image: {{ $.Values.image | quote }}
+          {{- if eq $mode "tools" }}
+          resources:
+            {{- toYaml $broker.tools.resources | nindent 12 }}
+          {{- end }}
           command: [/cody-execution]
           args:
             - broker
             - --mode={{ $mode }}
+            {{- if eq $mode "tools" }}
+            - --tools-max-scopes={{ $broker.tools.maxScopes }}
+            - --tools-max-scopes-per-lease={{ $broker.tools.maxScopesPerLease }}
+            {{- end }}
             - --kube-api-qps={{ $.Values.kubernetes.qps }}
             - --kube-api-burst={{ $.Values.kubernetes.burst }}
             - --sandbox-service-account={{ $.Release.Name }}-sandbox
@@ -144,6 +158,12 @@ metadata:
   name: {{ $.Release.Name }}-broker-{{ $mode }}
 spec:
   type: ClusterIP
+  {{- if eq $mode "tools" }}
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  {{- end }}
   selector:
     app: {{ $.Release.Name }}-broker-{{ $mode }}
   ports:
@@ -219,11 +239,13 @@ data:
     {{- if .Values.accessBroker.github.enabled -}}{{- $githubEndpoint = printf "%s://%s-broker-github.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace -}}{{- end -}}
     {{- $packageRegistryEndpoint := "" -}}
     {{- if .Values.accessBroker.packages.enabled -}}{{- $packageRegistryEndpoint = printf "%s://%s-broker-packages.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace -}}{{- end -}}
+    {{- $toolsEndpoint := "" -}}
+    {{- if .Values.accessBroker.tools.enabled -}}{{- $toolsEndpoint = printf "%s://%s-broker-tools.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace -}}{{- end -}}
     {{- $azureEndpoint := "" -}}
     {{- if .Values.accessBroker.azure.enabled -}}{{- $azureEndpoint = printf "%s://%s-broker-azure.%s.svc.cluster.local/msi/token" $scheme .Release.Name .Release.Namespace -}}{{- end }}
     {{- $caFile := "" -}}
     {{- if and (eq $transport "tls") .Values.accessBroker.caSecret -}}{{- $caFile = "/broker-ca/ca.crt" -}}{{- end }}
-    {{ dict "kubernetesEndpoint" (printf "%s://%s-broker-kubernetes.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace) "githubEndpoint" $githubEndpoint "packageRegistryEndpoint" $packageRegistryEndpoint "azureEndpoint" $azureEndpoint "caFile" $caFile "transportMode" $transport | toJson }}
+    {{ dict "kubernetesEndpoint" (printf "%s://%s-broker-kubernetes.%s.svc.cluster.local" $scheme .Release.Name .Release.Namespace) "githubEndpoint" $githubEndpoint "packageRegistryEndpoint" $packageRegistryEndpoint "toolsEndpoint" $toolsEndpoint "azureEndpoint" $azureEndpoint "caFile" $caFile "transportMode" $transport | toJson }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -253,6 +275,11 @@ subjects:
   {{- if .Values.accessBroker.packages.enabled }}
   - kind: ServiceAccount
     name: {{ .Release.Name }}-broker-packages
+    namespace: {{ .Release.Namespace }}
+  {{- end }}
+  {{- if .Values.accessBroker.tools.enabled }}
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-broker-tools
     namespace: {{ .Release.Namespace }}
   {{- end }}
   {{- if .Values.accessBroker.azure.enabled }}
