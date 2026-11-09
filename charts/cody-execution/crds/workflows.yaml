@@ -100,8 +100,37 @@ spec:
                   properties:
                     paths:
                       type: object
-                      required: [excludePrefixes, onAllExcluded]
+                      required: [onAllExcluded]
+                      x-kubernetes-validations:
+                        - rule: "has(self.excludePrefixes) || has(self.includePatterns) || has(self.excludePatterns)"
+                          message: Specify at least one path selector
                       properties:
+                        includePatterns:
+                          type: array
+                          description: Case-sensitive repository-relative file globs; supports *, ?, character classes, and ** directory segments.
+                          minItems: 1
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                            x-kubernetes-validations:
+                              - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
+                                message: Patterns must be repository-relative paths without empty, dot or parent segments
+                        excludePatterns:
+                          type: array
+                          description: Case-sensitive repository-relative file globs; supports *, ?, character classes, and ** directory segments.
+                          minItems: 1
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                            x-kubernetes-validations:
+                              - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
+                                message: Patterns must be repository-relative paths without empty, dot or parent segments
                         excludePrefixes:
                           type: array
                           description: Literal, case-sensitive repository-relative directory prefixes ending in a slash.
@@ -200,8 +229,37 @@ spec:
                   properties:
                     paths:
                       type: object
-                      required: [excludePrefixes, onAllExcluded]
+                      required: [onAllExcluded]
+                      x-kubernetes-validations:
+                        - rule: "has(self.excludePrefixes) || has(self.includePatterns) || has(self.excludePatterns)"
+                          message: Specify at least one path selector
                       properties:
+                        includePatterns:
+                          type: array
+                          description: Case-sensitive repository-relative file globs; supports *, ?, character classes, and ** directory segments.
+                          minItems: 1
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                            x-kubernetes-validations:
+                              - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
+                                message: Patterns must be repository-relative paths without empty, dot or parent segments
+                        excludePatterns:
+                          type: array
+                          description: Case-sensitive repository-relative file globs; supports *, ?, character classes, and ** directory segments.
+                          minItems: 1
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                            x-kubernetes-validations:
+                              - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
+                                message: Patterns must be repository-relative paths without empty, dot or parent segments
                         excludePrefixes:
                           type: array
                           description: Literal, case-sensitive repository-relative directory prefixes ending in a slash.
