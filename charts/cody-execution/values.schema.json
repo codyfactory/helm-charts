@@ -486,7 +486,9 @@
           "required": [
             "enabled",
             "externalEndpoints",
-            "internalEndpoints"
+            "internalEndpoints",
+            "maxScopes",
+            "maxScopesPerLease"
           ],
           "properties": {
             "enabled": {
@@ -590,6 +592,14 @@
                   }
                 }
               }
+            },
+            "maxScopes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxScopesPerLease": {
+              "type": "integer",
+              "minimum": 1
             }
           },
           "allOf": [

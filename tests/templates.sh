@@ -355,3 +355,15 @@ if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --s
   echo 'Trailing-dot toolbox host bypass unexpectedly allowed' >&2
   exit 1
 fi
+
+rg -q -- '--tools-max-scopes=128' <<<"$tools_deployment"
+rg -q -- '--tools-max-scopes-per-lease=64' <<<"$tools_deployment"
+for invalid in 'accessBroker.tools.maxScopes=0' 'accessBroker.tools.maxScopesPerLease=0' 'accessBroker.tools.maxScopes=4,accessBroker.tools.maxScopesPerLease=5'; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "$invalid" >/dev/null 2>&1; then
+    echo "Invalid tools capacity rendered: $invalid" >&2
+    exit 1
+  fi
+done
+tools_capacity="$(helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'accessBroker.tools.maxScopes=20,accessBroker.tools.maxScopesPerLease=5')"
+rg -q -- '--tools-max-scopes=20' <<<"$tools_capacity"
+rg -q -- '--tools-max-scopes-per-lease=5' <<<"$tools_capacity"

@@ -68,6 +68,8 @@ accessBroker:
     upstreamHosts: []
   tools:
     enabled: false
+    maxScopes: 128
+    maxScopesPerLease: 64
     resources: {}
     externalEndpoints: []
     internalEndpoints: []

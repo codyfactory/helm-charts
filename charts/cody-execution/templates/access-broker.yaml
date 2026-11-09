@@ -25,6 +25,7 @@
 {{- if and $broker.github.enabled (not $broker.github.upstreamHosts) -}}{{- fail "GitHub broker requires connector-derived upstreamHosts" -}}{{- end -}}
 {{- if and $broker.packages.enabled (not $broker.packages.upstreamHosts) -}}{{- fail "Package broker requires registry upstreamHosts" -}}{{- end -}}
 {{- if and $broker.tools.enabled (not (or $broker.tools.externalEndpoints $broker.tools.internalEndpoints)) -}}{{- fail "Tools broker requires explicit externalEndpoints or internalEndpoints" -}}{{- end -}}
+{{- if and $broker.tools.enabled (gt (int $broker.tools.maxScopesPerLease) (int $broker.tools.maxScopes)) -}}{{- fail "Tools maxScopesPerLease must not exceed maxScopes" -}}{{- end -}}
 {{- $modes := list "kubernetes" -}}
 {{- if $broker.tools.enabled -}}{{- $modes = append $modes "tools" -}}{{- end -}}
 {{- if $broker.packages.enabled -}}{{- $modes = append $modes "packages" -}}{{- end -}}
@@ -75,6 +76,10 @@ spec:
           args:
             - broker
             - --mode={{ $mode }}
+            {{- if eq $mode "tools" }}
+            - --tools-max-scopes={{ $broker.tools.maxScopes }}
+            - --tools-max-scopes-per-lease={{ $broker.tools.maxScopesPerLease }}
+            {{- end }}
             - --kube-api-qps={{ $.Values.kubernetes.qps }}
             - --kube-api-burst={{ $.Values.kubernetes.burst }}
             - --sandbox-service-account={{ $.Release.Name }}-sandbox
