@@ -363,3 +363,34 @@ Roll out toolbox support in stages, with no toolbox grants during the image upgr
 Before rollback, stop new toolbox work, remove toolbox grants, and let their leases end or fence. Confirm that toolbox grants and their retained tombstones are absent from the published snapshots before downgrading images or the CRD; removing profile YAML alone is insufficient. Preserve receipts and existing native session storage. Published release image digests must replace source-candidate pins; this chart does not publish those images or establish deployed acceptance.
 
 Runtime setup is bounded to four concurrent discoveries and 60 seconds overall, including session cleanup. Each endpoint gets at most 30 seconds; larger inventories divide the setup budget across the required four-wide waves, reserving ten percent for scheduling overhead so early dead endpoints cannot consume every later endpoint’s attempt. `fail` prevents model startup when a server or an explicit tool is missing. `continue` exposes the available subset and gives the model an availability notice; a wholly unavailable server is retried on a subsequent turn. Revocation always fences access regardless of this policy. Keep server-specific routing guidance in the Agent's existing versioned skills or reference inputs.
+
+### GitHub document path selection
+
+With an engine release supporting codyfactory/docs#68, a GitHub Workflow can
+limit reviews to matching files:
+
+```yaml
+paths:
+  includePatterns: [requirements/**/*.md]
+  excludePatterns: [requirements/**/execution.md, requirements/post-merge.md]
+  onAllExcluded: pass
+```
+
+Set this under `spec.github.paths` (or `spec.githubWorkflow.paths` for an
+ID-based source). Excludes override includes; omitted includes select all
+paths. Existing `excludePrefixes` remain supported and also exclude matches.
+Either side of a rename can require review. Only a complete, nonempty diff
+with no qualifying paths completes the named check successfully without a
+harness. The engine freezes the policy at admission.
+
+Globs match the full case-sensitive repository-relative path: `*`, `?`, and
+character classes operate within segments; a `**` segment matches zero or
+more directories. Embedded double stars such as `docs/**.md` are rejected;
+use `docs/**/*.md` for recursive Markdown matching. Brace alternatives and backslash escapes are unsupported.
+The engine rejects malformed globs before admitting work. Each list allows
+32 unique patterns, each at most 256 bytes.
+
+Install the updated Workflow CRD and upgrade both planes before configuring
+patterns. Helm upgrades do not update CRDs; follow [UPGRADE.md](UPGRADE.md).
+Remove pattern-based configuration and settle admitted work before rolling
+back to an engine that does not understand these fields.
