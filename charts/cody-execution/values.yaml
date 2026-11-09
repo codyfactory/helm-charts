@@ -68,5 +68,6 @@ accessBroker:
     upstreamHosts: []
   tools:
     enabled: false
+    resources: {}
     externalEndpoints: []
     internalEndpoints: []

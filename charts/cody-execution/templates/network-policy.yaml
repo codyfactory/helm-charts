@@ -1,8 +1,8 @@
 {{- if .Values.accessBroker.tools.enabled }}
 {{- $hosts := list }}
-{{- range concat .Values.accessBroker.tools.externalEndpoints .Values.accessBroker.tools.internalEndpoints }}{{- $hosts = append $hosts (lower .host) }}{{- end }}
+{{- range concat .Values.accessBroker.tools.externalEndpoints .Values.accessBroker.tools.internalEndpoints }}{{- $hosts = append $hosts (trimSuffix "." (lower .host)) }}{{- end }}
 {{- range .Values.networkPolicy.toolDomains }}
-{{- if has (lower .) $hosts }}{{- fail "Toolbox hosts must not appear in networkPolicy.toolDomains" }}{{- end }}
+{{- if has (trimSuffix "." (lower .)) $hosts }}{{- fail "Toolbox hosts must not appear in networkPolicy.toolDomains" }}{{- end }}
 {{- end }}
 {{- end }}
 {{- if and .Values.accessBroker.packages.enabled (ne .Values.accessBroker.networkPolicy.provider "none") }}

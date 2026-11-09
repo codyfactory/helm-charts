@@ -122,6 +122,8 @@ spec:
                     x-kubernetes-validations:
                       - rule: self.endpoint.startsWith('https://') || (has(self.allowPlaintext) && self.allowPlaintext)
                         message: HTTP endpoints require allowPlaintext
+                      - rule: "isURL(self.endpoint) && url(self.endpoint).getHostname() != '' && self.endpoint.matches('^https?://[^/?#@]+([/?][^#]*)?$')"
+                        message: Endpoint requires a valid host and must not contain userinfo or a fragment
                     properties:
                       name: {type: string, minLength: 1, maxLength: 63, pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'}
                       endpoint: {type: string, minLength: 1, maxLength: 2048, pattern: '^https?://'}

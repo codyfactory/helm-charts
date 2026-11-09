@@ -35,7 +35,7 @@ spec:
             dns:
               - matchName: {{ printf "%s-broker-feed.%s.svc.cluster.local" .Release.Name .Release.Namespace | quote }}
               {{- range $endpoints }}
-              - matchName: {{ lower .host | quote }}
+              - matchName: {{ lower .host | trimSuffix "." | quote }}
               {{- end }}
     - toEndpoints:
         - matchLabels:
@@ -54,7 +54,7 @@ spec:
               protocol: TCP
     {{- range .Values.accessBroker.tools.externalEndpoints }}
     - toFQDNs:
-        - matchName: {{ lower .host | quote }}
+        - matchName: {{ lower .host | trimSuffix "." | quote }}
       toPorts:
         - ports:
             - port: {{ .port | quote }}

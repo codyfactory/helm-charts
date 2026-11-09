@@ -337,3 +337,21 @@ if rg -q 'kind: CiliumNetworkPolicy' <<<"$tools_external"; then
   echo 'External tools enforcement rendered Cilium policies' >&2
   exit 1
 fi
+
+rg -q 'cpu: 100m' <<<"$tools_deployment"
+rg -q 'memory: 512Mi' <<<"$tools_deployment"
+for key in requests.cpu requests.memory limits.cpu limits.memory; do
+  if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set "accessBroker.tools.resources.$key=null" >/dev/null 2>&1; then
+    echo "Tools broker rendered without resource bound: $key" >&2
+    exit 1
+  fi
+done
+if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set-json 'accessBroker.tools.resources={}' >/dev/null 2>&1; then
+  echo 'Tools broker rendered with empty resources' >&2
+  exit 1
+fi
+
+if helm template fixture "$chart" -f "$values" -f examples/tools-broker.yaml --set 'networkPolicy.toolDomains[0]=MCP.DATADOGHQ.EU.' >/dev/null 2>&1; then
+  echo 'Trailing-dot toolbox host bypass unexpectedly allowed' >&2
+  exit 1
+fi
