@@ -1,0 +1,15 @@
+apiVersion: execution.cody.so/v1alpha1
+kind: Workflow
+metadata:
+  name: reviewer-guide
+spec:
+  agent: reviewer-guide
+  github:
+    connectorRef: github
+    repository: example/repository
+    commands:
+      entries:
+        - name: guide
+          usage: /cody guide
+          who: Anyone who can comment on the pull request
+          description: Post an advisory reviewer guide for the current head

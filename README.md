@@ -394,3 +394,19 @@ Install the updated Workflow CRD and upgrade both planes before configuring
 patterns. Helm upgrades do not update CRDs; follow [UPGRADE.md](UPGRADE.md).
 Remove pattern-based configuration and settle admitted work before rolling
 back to an engine that does not understand these fields.
+
+## Pull request command catalogs
+
+The `0.6.3` source candidate adds typed `spec.github.commands` configuration for
+`review`, `re-review`, `waive`, and `guide`, with per-Workflow `rerunAliases`.
+Entries supply `name`, `usage`, `who`, and `description`; optional
+`targetPattern` validates the finding or rule ID for waiver commands. Reasons
+remain in the original PR comment and are not retained in the command catalog. The execution image must implement this command contract before using
+these fields. This source candidate is not a published chart release.
+
+Review workflows still require `reporting.checkName`. A command-only workflow
+whose only entry is `guide` may omit event triggers and reporting; see
+[the reviewer guide example](examples/github-reviewer-guide.yaml). Guide output
+is an advisory PR comment and does not produce a check or review disposition.
+Upgrade the Workflow CRD before configuring commands, following
+[the CRD upgrade procedure](UPGRADE.md); older schemas prune the command catalog.
