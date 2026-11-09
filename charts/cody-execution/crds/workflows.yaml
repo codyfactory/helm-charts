@@ -118,6 +118,11 @@ spec:
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
                                 message: Patterns must be repository-relative paths without empty, dot or parent segments
+                              - rule: >-
+                                  !self.contains('{') && !self.contains('}') && !self.contains('\\')
+                                message: Brace alternatives and backslash escapes are unsupported
+                              - rule: "self.split('/').all(segment, !segment.contains('**') || segment == '**')"
+                                message: Double stars must occupy an entire path segment
                         excludePatterns:
                           type: array
                           description: Case-sensitive repository-relative file globs; supports *, ?, character classes, and ** directory segments.
@@ -131,6 +136,11 @@ spec:
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
                                 message: Patterns must be repository-relative paths without empty, dot or parent segments
+                              - rule: >-
+                                  !self.contains('{') && !self.contains('}') && !self.contains('\\')
+                                message: Brace alternatives and backslash escapes are unsupported
+                              - rule: "self.split('/').all(segment, !segment.contains('**') || segment == '**')"
+                                message: Double stars must occupy an entire path segment
                         excludePrefixes:
                           type: array
                           description: Literal, case-sensitive repository-relative directory prefixes ending in a slash.
@@ -247,6 +257,11 @@ spec:
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
                                 message: Patterns must be repository-relative paths without empty, dot or parent segments
+                              - rule: >-
+                                  !self.contains('{') && !self.contains('}') && !self.contains('\\')
+                                message: Brace alternatives and backslash escapes are unsupported
+                              - rule: "self.split('/').all(segment, !segment.contains('**') || segment == '**')"
+                                message: Double stars must occupy an entire path segment
                         excludePatterns:
                           type: array
                           description: Case-sensitive repository-relative file globs; supports *, ?, character classes, and ** directory segments.
@@ -260,6 +275,11 @@ spec:
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('/') && !self.endsWith('/') && !self.contains('//') && !self.matches('(^|/)[.]{1,2}(/|$)')"
                                 message: Patterns must be repository-relative paths without empty, dot or parent segments
+                              - rule: >-
+                                  !self.contains('{') && !self.contains('}') && !self.contains('\\')
+                                message: Brace alternatives and backslash escapes are unsupported
+                              - rule: "self.split('/').all(segment, !segment.contains('**') || segment == '**')"
+                                message: Double stars must occupy an entire path segment
                         excludePrefixes:
                           type: array
                           description: Literal, case-sensitive repository-relative directory prefixes ending in a slash.

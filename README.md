@@ -385,7 +385,8 @@ harness. The engine freezes the policy at admission.
 
 Globs match the full case-sensitive repository-relative path: `*`, `?`, and
 character classes operate within segments; a `**` segment matches zero or
-more directories. Brace alternatives and backslash escapes are unsupported.
+more directories. Embedded double stars such as `docs/**.md` are rejected;
+use `docs/**/*.md` for recursive Markdown matching. Brace alternatives and backslash escapes are unsupported.
 The engine rejects malformed globs before admitting work. Each list allows
 32 unique patterns, each at most 256 bytes.
 
