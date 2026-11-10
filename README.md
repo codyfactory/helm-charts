@@ -394,3 +394,21 @@ Install the updated Workflow CRD and upgrade both planes before configuring
 patterns. Helm upgrades do not update CRDs; follow [UPGRADE.md](UPGRADE.md).
 Remove pattern-based configuration and settle admitted work before rolling
 back to an engine that does not understand these fields.
+
+## Sandbox placement and local storage
+
+The 0.6.3 source candidate wires installation defaults through `sandbox.nodeSelector`,
+`sandbox.tolerations`, and `sandbox.resources.requests.ephemeral-storage` /
+`sandbox.resources.limits.ephemeral-storage`. The default execution and onboarding images are pinned to compatible
+`docker.io/donchev7` digests built from
+[cody#84 at f59d65e5](https://github.com/codyfactory/cody/commit/f59d65e581c70f6636192684e990fc8646951f43).
+The chart remains a source candidate until its package is published.
+
+An Agent's present sandbox setting replaces its installation default as a whole,
+including empty maps and lists. The chart's default selector and tolerations are empty.
+The 1Gi ephemeral-storage request, 2Gi limit and 1Gi workspace size are unmeasured
+starting values; size them against representative workloads and measured eviction
+overshoot. Reviews, finding replies and scheduled fresh occurrences use bounded
+`emptyDir`; conversational work and scheduled reuse retain their PVCs. Existing
+PVC size and storage class remain fixed. See the
+[storage and acceptance guide](https://github.com/codyfactory/cody/blob/feat/sandbox-policy/hack/planes/SANDBOX-STORAGE.md).

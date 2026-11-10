@@ -1,4 +1,4 @@
-image: "ghcr.io/codyfactory/cody-execution@sha256:18cd74b84a44f66e72e37e43000e9498cc2ed8c90ad9c2917148c3abaf41c909"
+image: "docker.io/donchev7/cody-execution@sha256:09fc81bc882e68e19cf53c87eabe1629f6bf2d493ed154b4ec961c107e06bbd0"
 installation: ""
 gatewayURL: ""
 installationToken: ""
@@ -15,6 +15,8 @@ receipts:
   storageClass: ""
   initializeOnInstall: false
 sandbox:
+  nodeSelector: {}
+  tolerations: []
   storageClass: ""
   workspaceSize: 1Gi
   idleTimeout: 15m
@@ -23,9 +25,11 @@ sandbox:
     requests:
       cpu: 100m
       memory: 256Mi
+      ephemeral-storage: 1Gi
     limits:
       cpu: "2"
       memory: 2Gi
+      ephemeral-storage: 2Gi
 networkPolicy:
   enabled: false
   toolDomains: []
@@ -33,7 +37,7 @@ scheduling: {}
 
 onboarding:
   enabled: false
-  image: "ghcr.io/codyfactory/cody-runtime-general@sha256:4f48f241cc11c152de082bb8aaa72bdc58d3acd8342ad45df0ca4219c77d0833"
+  image: "docker.io/donchev7/cody-runtime-general@sha256:fff351ec0177f54e1cf6bff2f81070bf0ed3990bb54b7df214961da3f1ea9b2e"
   model: cody/codex-v1
 assetAccess:
   azure:

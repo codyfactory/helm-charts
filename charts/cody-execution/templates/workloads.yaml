@@ -118,6 +118,14 @@ spec:
             - --sandbox-storage-class
             - {{ . | quote }}
             {{- end }}
+            - --sandbox-node-selector
+            - {{ $.Values.sandbox.nodeSelector | toJson | quote }}
+            - --sandbox-tolerations
+            - {{ $.Values.sandbox.tolerations | toJson | quote }}
+            - --sandbox-ephemeral-storage-request
+            - {{ index $.Values.sandbox.resources.requests "ephemeral-storage" | quote }}
+            - --sandbox-ephemeral-storage-limit
+            - {{ index $.Values.sandbox.resources.limits "ephemeral-storage" | quote }}
             - --sandbox-workspace-size
             - {{ $.Values.sandbox.workspaceSize | quote }}
             - --sandbox-cpu-request
