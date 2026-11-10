@@ -96,12 +96,7 @@ spec:
                   maxLength: 63
                 github:
                   type: object
-                  required: [connectorRef, repository]
-                  x-kubernetes-validations:
-                    - rule: "has(self.on) || (has(self.commands) && ((has(self.commands.entries) && size(self.commands.entries) > 0) || (has(self.commands.rerunAliases) && size(self.commands.rerunAliases) > 0)))"
-                      message: Specify event triggers or command entries
-                    - rule: "(has(self.commands) && has(self.commands.entries) && size(self.commands.entries) > 0 && self.commands.entries.all(e, e.name == 'guide') && (!has(self.commands.rerunAliases) || size(self.commands.rerunAliases) == 0) && !has(self.on)) || (has(self.reporting) && has(self.reporting.checkName))"
-                      message: Review workflows require reporting.checkName; command-only guide workflows do not
+                  required: [connectorRef, repository, "on", reporting]
                   properties:
                     commands:
                       type: object
@@ -126,7 +121,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                enum: [review, re-review, waive, guide]
+                                enum: [review, re-review, waive]
                               targetPattern:
                                 type: string
                                 maxLength: 1024
