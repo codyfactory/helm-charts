@@ -2,7 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-Chart `0.5.0` is published on `main` under the immutable `cody-execution-0.5.0` tag. This branch contains the `0.6.0` **source candidate**, which adds AccessProfile configuration and is not a published release. Do not treat synthetic example digests or core test packages as published artifacts.
+Chart `0.6.3` is available from the public Helm index alongside `0.5.0`. It adds AccessProfile configuration and Sandbox placement and storage defaults.
 
 ## Install
 
@@ -90,8 +90,6 @@ The example digests and token are synthetic lint fixtures. Real controller/nativ
 
 No Actions or Pages deployment is required. Authenticate Git through your usual GitHub credentials. Never overwrite any published version, tag or package. First build/push public execution/general/SRE images from the same clean core commit and verify anonymous amd64/arm64 pulls, following the core [rollout guide](https://github.com/codyfactory/cody/blob/codex/saas-onboarding-v2-spec/deploy/fly/SAAS-HELM.md).
 
-The `0.6.0` source candidate retains the published `0.5.0` image defaults until publication. Re-pin compatible execution and runtime images before publishing: the broker now receives `--transport-mode` and `--kube-api-qps`, which the `0.5.0` execution image does not support.
-
 Set a **new unused version** in `charts/cody-execution/Chart.yaml`. Pin `values.yaml`'s `image` and `onboarding.image` to the real public execution and general-runtime digests. Validate with actual production values (never commit private values). Then:
 
 ```sh
@@ -115,7 +113,7 @@ git push origin HEAD
 # Merge that publication PR before tagging its exact main commit.
 ```
 
-After merge, checkout/pull main and create the immutable `cody-execution-<version>` tag on the publication commit. Preserve all old packages/index entries. Verify anonymous acquisition with an empty Helm repository config before adding the supported release descriptor to core. The descriptor records package URL, byte size, SHA256, core commit, image digests, protocol, chart/runtime versions and explicitly tested transitions. Do not infer runtime version from chart version. Do not activate a descriptor for the `0.6.0` source candidate before its package and images are published.
+After merge, checkout/pull main and create the immutable `cody-execution-<version>` tag on the publication commit. Preserve all old packages/index entries. Verify anonymous acquisition with an empty Helm repository config before adding the supported release descriptor to core. The descriptor records package URL, byte size, SHA256, core commit, image digests, protocol, chart/runtime versions and explicitly tested transitions. Do not infer runtime version from chart version. Activate a descriptor after its package and images are published.
 
 Only chart sources, generic CRDs, packages/index and public docs belong here. No credentials, kubeconfigs, private values, company tooling or application source.
 
@@ -397,12 +395,7 @@ back to an engine that does not understand these fields.
 
 ## Sandbox placement and local storage
 
-The 0.6.3 source candidate wires installation defaults through `sandbox.nodeSelector`,
-`sandbox.tolerations`, and `sandbox.resources.requests.ephemeral-storage` /
-`sandbox.resources.limits.ephemeral-storage`. The default execution and onboarding images are pinned to compatible
-`docker.io/donchev7` digests built from
-[cody#84 at f59d65e5](https://github.com/codyfactory/cody/commit/f59d65e581c70f6636192684e990fc8646951f43).
-The chart remains a source candidate until its package is published.
+Chart `0.6.3` wires installation defaults through `sandbox.nodeSelector`, `sandbox.tolerations`, and `sandbox.resources.requests.ephemeral-storage` / `sandbox.resources.limits.ephemeral-storage`. The default execution and onboarding images are pinned to verified `ghcr.io/codyfactory` digests.
 
 An Agent's present sandbox setting replaces its installation default as a whole,
 including empty maps and lists. The chart's default selector and tolerations are empty.

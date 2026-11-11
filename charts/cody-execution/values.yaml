@@ -1,4 +1,4 @@
-image: "docker.io/donchev7/cody-execution@sha256:09fc81bc882e68e19cf53c87eabe1629f6bf2d493ed154b4ec961c107e06bbd0"
+image: "ghcr.io/codyfactory/cody-execution@sha256:4d36dbb59813714e724d35f0f5608b4ec54e0b7fd70c9222ab9701256179a3c9"
 installation: ""
 gatewayURL: ""
 installationToken: ""
@@ -34,16 +34,14 @@ networkPolicy:
   enabled: false
   toolDomains: []
 scheduling: {}
-
 onboarding:
   enabled: false
-  image: "docker.io/donchev7/cody-runtime-general@sha256:fff351ec0177f54e1cf6bff2f81070bf0ed3990bb54b7df214961da3f1ea9b2e"
+  image: "ghcr.io/codyfactory/cody-runtime-general@sha256:4b050052e2c85a0675ccf9243c54ed5c20fc7c309673a576af46ee9d21f081a5"
   model: cody/codex-v1
 assetAccess:
   azure:
     tenantID: ""
     clientID: ""
-
 assetValidation:
   size: 2Gi
 accessBroker:
