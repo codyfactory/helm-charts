@@ -405,3 +405,9 @@ overshoot. Reviews, finding replies and scheduled fresh occurrences use bounded
 `emptyDir`; conversational work and scheduled reuse retain their PVCs. Existing
 PVC size and storage class remain fixed. See the
 [storage and acceptance guide](https://github.com/codyfactory/cody/blob/feat/sandbox-policy/hack/planes/SANDBOX-STORAGE.md).
+
+## Workflow source status
+
+The Workflow CRD retains `status.sources` and the `SourcesReady` condition reported by the execution controller. Each source reports `Accepted`, `Pending`, `ConnectorUnbound`, `PolicyDenied`, `Conflict`, or `Invalid`; conflicts can name other installations in the same organization. `status.sourcesHash` lets the controller avoid unchanged status writes. This schema requires the source-status controller implementation from codyfactory/docs#73 before these fields are populated.
+
+Apply the updated Workflow CRD through your deployment system before updating the execution controller. Helm upgrades do not update existing CRDs automatically. Existing Workflow status patch permissions already cover this change.
