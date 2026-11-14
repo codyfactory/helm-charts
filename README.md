@@ -408,8 +408,4 @@ PVC size and storage class remain fixed. See the
 
 ## Workflow source status
 
-The Workflow CRD retains `status.sources` and the `SourcesReady` condition reported by the execution controller. Each source reports `Accepted`, `Pending`, `ConnectorUnbound`, `PolicyDenied`, `Conflict`, or `Invalid`; conflicts can name other installations in the same organization. `status.sourcesHash` lets the controller avoid unchanged status writes. This schema requires the source-status controller implementation from codyfactory/docs#73 before these fields are populated.
-
-Apply the updated Workflow CRD through your deployment system before updating the execution controller. Helm upgrades do not update existing CRDs automatically. Existing Workflow status patch permissions already cover this change.
-
-GitHub Workflows may omit `spec.github.connectorRef`, just as Agent `auth.githubApp` may omit `connectorRef`. Omission selects the organization's default GitHub connection; an explicit ref selects that named connection. The control plane owns default selection and reports `ConnectorUnbound` when no connection resolves.
+Workflows report source authorization and conflicts through `status.sources`, `SourcesReady`, and the `SourcesReady`/`SourceReason` printer columns. See [the coordinated source-authorization upgrade](UPGRADE.md#organization-source-authorization) before using these fields or optional connector references.

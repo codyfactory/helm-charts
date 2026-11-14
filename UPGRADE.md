@@ -68,3 +68,19 @@ Within a compatible current installation, ordinary credential rotation preserves
 the generated runtime token and every receipt/Sandbox PVC. Use the installed
 chart version, disable initialization, restart `<release>-execution-plane`,
 confirm fresh authentication and a successful test, then revoke the predecessor.
+
+## Organization source authorization
+
+The candidate 0.6.4 schema accompanies [Cody #97](https://github.com/codyfactory/cody/pull/97). Apply its CRDs through GitOps before the matching controller rollout: Helm upgrades do not update existing CRDs. An older Workflow CRD silently prunes `status.sources`, `status.conditions`, and `status.sourcesHash`; readiness never appears and the controller repeatedly patches status.
+
+Verify the live schema before updating the controller:
+
+```sh
+kubectl get crd workflows.execution.cody.so -o jsonpath='{.spec.versions[?(@.name=="v1alpha1")].schema.openAPIV3Schema.properties.status.properties.sourcesHash.type}'
+```
+
+The result must be `string`. Use the reviewed CRD-apply procedure above when it is missing. Existing `workflows/status` permissions cover these updates.
+
+GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an owner default change, owner disconnect or operator unbind changes the selected connection. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
+
+Do not tag or publish 0.6.4 until `values.yaml` pins an execution image built from the final #97 implementation and `appVersion` names that release. The currently pinned image predates optional Workflow references and source readiness. This draft schema is not a runnable release with that image.
