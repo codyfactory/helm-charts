@@ -87,13 +87,13 @@ The result must be `string`. Use the reviewed CRD-apply procedure above when it 
 
 GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an owner's audited `SetDefault` selects a different connection. Owner disconnect or operator unbind of the default clears it and leaves unqualified Workflows `ConnectorUnbound` until an owner calls `SetDefault`. Only the organization's first-ever connection for each provider becomes default automatically; later connects never restore a cleared default, even after all prior bindings were removed. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
 
-Execution chart `0.6.4` retains the execution/runtime images from Cody commit `5c3729d06f15c58bc6247aeb4eae5d2af4063d4f`, build `0.6.4-5c3729d0`. The nullable-default change only affects the control plane: its image is rebuilt from `2126ab5d31325d140aeb84e5bda7cf24ba3ec84d` as `0.6.4-2126ab5d`, pinned by control-plane chart `0.4.0`. Both builds support Linux AMD64 and ARM64; each chart appVersion identifies its corresponding image build. The chart package/index is published separately after the source PR merges.
+Execution chart `0.6.4` pins rebuilt execution/runtime images from Cody commit `9272b0cc54df1340c87a2508d7887c3ad8872960`, build `0.6.4-9272b0cc`. This execution build keeps temporary Slack source and schedule-reporting lookup failures retryable during admission. Subscription and status synchronization still isolate failed lookups. The control-plane image retains the nullable-default build from `2126ab5d31325d140aeb84e5bda7cf24ba3ec84d` as `0.6.4-2126ab5d`, pinned by control-plane chart `0.4.0`. Both builds support Linux AMD64 and ARM64; each chart appVersion identifies its corresponding image build. The chart package/index is published separately after the source PR merges.
 
 | Image | Immutable reference |
 | --- | --- |
-| execution | `ghcr.io/codyfactory/cody-execution@sha256:077aafe235462ceec99cfc92452da71ff7833228147f1e8f322c5b7e7539cce7` |
-| general | `ghcr.io/codyfactory/cody-runtime-general@sha256:53ff4eca494ee7ce3df27124f7fd34324b9447bf698fd23964e1725fc61a45cb` |
-| sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:c7e0762606c45b9bfe12feedee608a27ec7c6bda1f23b5020ead159fa1db3782` |
+| execution | `ghcr.io/codyfactory/cody-execution@sha256:810051eeaa4dbfce6f505579effaa9f2fab568c818ead331496a4d4fd0bdc03d` |
+| general | `ghcr.io/codyfactory/cody-runtime-general@sha256:5833e510c64e0d9aeb99c718a16d9102509448ec9cc8a337d0d8bb12a671065c` |
+| sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:b584cc7d73c2d96d437e79be5011f360eceedac12dba73b200ff107d106057ef` |
 | control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:4c9c432011baa80712a8245a68c6548c4c14d1edee9171377c6c275c377ade11` |
 
 Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.

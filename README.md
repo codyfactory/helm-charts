@@ -4,7 +4,7 @@ This is the canonical public chart source for Cody's customer execution plane. C
 
 Chart `0.6.3` is available from the public Helm index alongside `0.5.0`. It adds AccessProfile configuration and Sandbox placement and storage defaults.
 
-Candidate chart `0.6.4` adds organization source authorization and pins the `0.6.4-5c3729d0` image build. See [UPGRADE.md](UPGRADE.md) for the coordinated control/execution cutover and image digests.
+Candidate chart `0.6.4` adds organization source authorization and pins the `0.6.4-9272b0cc` image build. See [UPGRADE.md](UPGRADE.md) for the coordinated control/execution cutover and image digests.
 
 ## Install
 
@@ -97,7 +97,7 @@ Set a **new unused version** in `charts/cody-execution/Chart.yaml`. Pin `values.
 ```sh
 export CODY_CHART_VERSION=0.6.0
 export CODY_CORE_COMMIT=EXACT_40_CHARACTER_CORE_COMMIT
-export CODY_SRE_IMAGE=ghcr.io/codyfactory/cody-runtime-sre@sha256:c7e0762606c45b9bfe12feedee608a27ec7c6bda1f23b5020ead159fa1db3782
+export CODY_SRE_IMAGE=ghcr.io/codyfactory/cody-runtime-sre@sha256:b584cc7d73c2d96d437e79be5011f360eceedac12dba73b200ff107d106057ef
 
 test ! -e "cody-execution-${CODY_CHART_VERSION}.tgz"
 git diff --check
