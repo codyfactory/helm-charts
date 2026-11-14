@@ -422,3 +422,9 @@ available. Revoking the schedule grant closes both entry points.
 
 Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
 images before enabling these controls. See [UPGRADE.md](UPGRADE.md).
+
+Before granting or unpausing a managed Workflow, verify that the running
+execution controller uses the matching image and that the hosted plane has
+acknowledged the exact Workflow generation and controls in
+`status.schedule.policy`. An applied CRD and a generic observed generation
+alone cannot establish compatibility with an older controller.

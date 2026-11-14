@@ -377,6 +377,19 @@ spec:
                 schedule:
                   type: object
                   properties:
+                    policy:
+                      description: Managed schedule controls acknowledged by the hosted plane for this Workflow generation.
+                      type: object
+                      properties:
+                        ttlSeconds:
+                          type: integer
+                          format: int64
+                          minimum: 60
+                          maximum: 2592000
+                        threaded:
+                          type: boolean
+                        followUps:
+                          type: boolean
                     nextFireTime:
                       type: string
                       format: date-time
