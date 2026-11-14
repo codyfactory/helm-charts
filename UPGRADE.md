@@ -75,6 +75,8 @@ The candidate 0.6.4 schema accompanies [Cody #97](https://github.com/codyfactory
 
 Stop all old control-plane writers before starting any replacement control-plane process; do not overlap versions through a rolling update. This includes API, gateway, connectors and reconciliation roles. Migration 053 moves legacy report queues, and startup repeats the move before shared workers start to recover jobs inserted between migration and shutdown. That repair is not a compatibility service for old processes that continue enqueueing after startup.
 
+The pre-release migrations in #97 are edited in place: 049 and 051 retain a defaults row with a nullable selected ID, and Slack OAuth recovery is migration 054. Recreate disposable databases initialized from superseded #97 candidates; this is not an incremental upgrade from those candidate schemas.
+
 Verify the live schema before updating the controller:
 
 ```sh
@@ -85,13 +87,13 @@ The result must be `string`. Use the reviewed CRD-apply procedure above when it 
 
 GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an explicit owner default change selects a different connection. Owner disconnect or operator unbind clears the default and leaves unqualified Workflows `ConnectorUnbound` with guidance to select one. Only the organization's first-ever connection for each provider becomes default automatically; later connects never restore a cleared default, even after all prior bindings were removed. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
 
-Chart `0.6.4` pins images from Cody commit `5c3729d06f15c58bc6247aeb4eae5d2af4063d4f`, published as `0.6.4-5c3729d0` for Linux AMD64 and ARM64. Its `appVersion` identifies that build. The chart package/index is published separately after the source PR merges.
+Execution chart `0.6.4` retains the execution/runtime images from Cody commit `5c3729d06f15c58bc6247aeb4eae5d2af4063d4f`, build `0.6.4-5c3729d0`. The nullable-default change only affects the control plane: its image is rebuilt from `2126ab5d31325d140aeb84e5bda7cf24ba3ec84d` as `0.6.4-2126ab5d`, pinned by control-plane chart `0.4.0`. Both builds support Linux AMD64 and ARM64; each chart appVersion identifies its corresponding image build. The chart package/index is published separately after the source PR merges.
 
 | Image | Immutable reference |
 | --- | --- |
 | execution | `ghcr.io/codyfactory/cody-execution@sha256:077aafe235462ceec99cfc92452da71ff7833228147f1e8f322c5b7e7539cce7` |
 | general | `ghcr.io/codyfactory/cody-runtime-general@sha256:53ff4eca494ee7ce3df27124f7fd34324b9447bf698fd23964e1725fc61a45cb` |
 | sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:c7e0762606c45b9bfe12feedee608a27ec7c6bda1f23b5020ead159fa1db3782` |
-| control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:9b1c7255fd32332aae91ef22a37b20f5ca3d272fe4f61f0170167fdaa1e4cb8b` |
+| control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:4c9c432011baa80712a8245a68c6548c4c14d1edee9171377c6c275c377ade11` |
 
 Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
