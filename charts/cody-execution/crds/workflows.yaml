@@ -96,7 +96,7 @@ spec:
                   maxLength: 63
                 github:
                   type: object
-                  required: [connectorRef, repository, "on", reporting]
+                  required: [repository, "on", reporting]
                   properties:
                     paths:
                       type: object
@@ -158,6 +158,7 @@ spec:
                           type: string
                           enum: [pass]
                     connectorRef:
+                      description: Select a named organization connection; omit to use its default GitHub connection.
                       type: string
                       minLength: 1
                       maxLength: 63
@@ -361,6 +362,8 @@ spec:
                       reason:
                         type: string
                         enum: [Accepted, Pending, ConnectorUnbound, PolicyDenied, Conflict, Invalid]
+                      message:
+                        type: string
                       source:
                         type: object
                         required: [provider, connectorID, resourceID]
