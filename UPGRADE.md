@@ -73,6 +73,8 @@ confirm fresh authentication and a successful test, then revoke the predecessor.
 
 The candidate 0.6.4 schema accompanies [Cody #97](https://github.com/codyfactory/cody/pull/97). Apply its CRDs through GitOps before the matching controller rollout: Helm upgrades do not update existing CRDs. An older Workflow CRD silently prunes `status.sources`, `status.conditions`, and `status.sourcesHash`; readiness never appears and the controller repeatedly patches status.
 
+Stop all old control-plane writers before starting any replacement control-plane process; do not overlap versions through a rolling update. This includes API, gateway, connectors and reconciliation roles. Migration 053 moves legacy report queues, and startup repeats the move before shared workers start to recover jobs inserted between migration and shutdown. That repair is not a compatibility service for old processes that continue enqueueing after startup.
+
 Verify the live schema before updating the controller:
 
 ```sh
@@ -81,15 +83,15 @@ kubectl get crd workflows.execution.cody.so -o jsonpath='{.spec.versions[?(@.nam
 
 The result must be `string`. Use the reviewed CRD-apply procedure above when it is missing. Existing `workflows/status` permissions cover these updates.
 
-GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an owner default change, owner disconnect or operator unbind changes the selected connection. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
+GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an explicit owner default change selects a different connection. Owner disconnect or operator unbind clears the default and leaves unqualified Workflows `ConnectorUnbound` with guidance to select one. Only the organization's first-ever connection for each provider becomes default automatically; later connects never restore a cleared default, even after all prior bindings were removed. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
 
-Chart `0.6.4` pins images from Cody commit `e5a241118b312351029824b1d61922c361c5187e`, published as `0.6.4-e5a24111` for Linux AMD64 and ARM64. Its `appVersion` identifies that build. The chart package/index is published separately after the source PR merges.
+Chart `0.6.4` pins images from Cody commit `5c3729d06f15c58bc6247aeb4eae5d2af4063d4f`, published as `0.6.4-5c3729d0` for Linux AMD64 and ARM64. Its `appVersion` identifies that build. The chart package/index is published separately after the source PR merges.
 
 | Image | Immutable reference |
 | --- | --- |
-| execution | `ghcr.io/codyfactory/cody-execution@sha256:a054502280b0edb8691520ded1ae31336a8caf24ce18356d08c7cb9ba47e7934` |
-| general | `ghcr.io/codyfactory/cody-runtime-general@sha256:30a64ce3905819d3e12f33bbc89ea4107127d019ac614b0b143c794b8f39be3f` |
-| sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:58002eed1d9fd31fa2a538713da891c4fdad70483e6da13769ac11064287a4e4` |
-| control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:832a5c830ee692f70c595be56c378099985e519b678d23c7037afc11a3acc5f8` |
+| execution | `ghcr.io/codyfactory/cody-execution@sha256:077aafe235462ceec99cfc92452da71ff7833228147f1e8f322c5b7e7539cce7` |
+| general | `ghcr.io/codyfactory/cody-runtime-general@sha256:53ff4eca494ee7ce3df27124f7fd34324b9447bf698fd23964e1725fc61a45cb` |
+| sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:c7e0762606c45b9bfe12feedee608a27ec7c6bda1f23b5020ead159fa1db3782` |
+| control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:9b1c7255fd32332aae91ef22a37b20f5ca3d272fe4f61f0170167fdaa1e4cb8b` |
 
 Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
