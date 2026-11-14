@@ -105,6 +105,48 @@ spec:
                   type: object
                   required: [repository, "on", reporting]
                   properties:
+                    commands:
+                      type: object
+                      properties:
+                        rerunAliases:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                            pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                        entries:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: map
+                          x-kubernetes-list-map-keys: [name]
+                          items:
+                            type: object
+                            required: [name, usage, who, description]
+                            properties:
+                              name:
+                                type: string
+                                enum: [review, re-review, waive]
+                              targetPattern:
+                                type: string
+                                maxLength: 1024
+                              usage:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              who:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              description:
+                                type: string
+                                minLength: 1
+                                maxLength: 1024
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
                     paths:
                       type: object
                       required: [onAllExcluded]
@@ -245,6 +287,48 @@ spec:
                   type: object
                   required: [checkName, baseBranch, actions]
                   properties:
+                    commands:
+                      type: object
+                      properties:
+                        rerunAliases:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                            pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                        entries:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: map
+                          x-kubernetes-list-map-keys: [name]
+                          items:
+                            type: object
+                            required: [name, usage, who, description]
+                            properties:
+                              name:
+                                type: string
+                                enum: [review, re-review, waive]
+                              targetPattern:
+                                type: string
+                                maxLength: 1024
+                              usage:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              who:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              description:
+                                type: string
+                                minLength: 1
+                                maxLength: 1024
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
                     paths:
                       type: object
                       required: [onAllExcluded]
