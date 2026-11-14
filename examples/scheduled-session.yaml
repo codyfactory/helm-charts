@@ -1,0 +1,24 @@
+apiVersion: execution.cody.so/v1alpha1
+kind: Workflow
+metadata:
+  name: sre-scheduled-session
+spec:
+  agent: sre
+  sandbox:
+    continuity: reuse
+  schedule:
+    cron: "17,47 * * * *"
+    timezone: UTC
+    paused: true
+    policies:
+      missedRun: skip
+      catchupWindow: 5m
+      overlap: skip
+    session:
+      ttl: 45m
+    reporting:
+      slack:
+        connectorRef: team-slack
+        channelID: C12345678
+        mode: sessionThread
+        followUps: true

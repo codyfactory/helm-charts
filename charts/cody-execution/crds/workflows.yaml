@@ -32,6 +32,12 @@ spec:
                   message: A scheduled Workflow requires explicit sandbox continuity
                 - rule: "!has(self.sandbox) || has(self.schedule)"
                   message: Explicit sandbox continuity requires a schedule
+                - rule: >-
+                    !has(self.schedule) ||
+                    ((!has(self.schedule.session) &&
+                    (!has(self.schedule.reporting.slack.mode) || self.schedule.reporting.slack.mode != 'sessionThread')) ||
+                    (has(self.sandbox) && self.sandbox.continuity == 'reuse'))
+                  message: Scheduled session TTL and threaded reporting require reusable sandbox continuity
               properties:
                 sandbox:
                   type: object
@@ -44,6 +50,15 @@ spec:
                   type: object
                   required: [cron, timezone, policies, reporting]
                   properties:
+                    session:
+                      type: object
+                      required: [ttl]
+                      properties:
+                        ttl:
+                          type: string
+                          minLength: 2
+                          maxLength: 64
+                          pattern: '^([0-9]+(\.[0-9]+)?(h|ms|us|µs|μs|ns|m|s))+$'
                     reporting:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
@@ -53,7 +68,16 @@ spec:
                         slack:
                           type: object
                           required: [connectorRef, channelID]
+                          x-kubernetes-validations:
+                            - rule: "!has(self.followUps) || !self.followUps || (has(self.mode) && self.mode == 'sessionThread')"
+                              message: Slack follow-ups require sessionThread reporting
                           properties:
+                            mode:
+                              type: string
+                              enum: [sessionThread]
+                            followUps:
+                              type: boolean
+                              default: false
                             connectorRef:
                               type: string
                               pattern: '^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$'
@@ -356,9 +380,24 @@ spec:
                     nextFireTime:
                       type: string
                       format: date-time
+                    session:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        openedAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+                        closedReason:
+                          type: string
                     latest:
                       type: object
                       properties:
+                        sessionID:
+                          type: string
                         commandID:
                           type: string
                         nominalTime:
