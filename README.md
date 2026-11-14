@@ -4,6 +4,8 @@ This is the canonical public chart source for Cody's customer execution plane. C
 
 Chart `0.6.3` is available from the public Helm index alongside `0.5.0`. It adds AccessProfile configuration and Sandbox placement and storage defaults.
 
+Candidate chart `0.6.4` adds organization source authorization and pins the `0.6.4-e5a24111` image build. See [UPGRADE.md](UPGRADE.md) for the coordinated control/execution cutover and image digests.
+
 ## Install
 
 Use an existing Linux amd64/arm64 Kubernetes cluster with persistent storage, Helm 4.3.1 and kubectl 1.37.2. In [Cody](https://app.cody.so), create an organization and installation, request inference approval and authorize/download that installation's private values. Keep the downloaded file private; it contains a long-lived installation key. Helm retains inline values in its release records.
@@ -95,7 +97,7 @@ Set a **new unused version** in `charts/cody-execution/Chart.yaml`. Pin `values.
 ```sh
 export CODY_CHART_VERSION=0.6.0
 export CODY_CORE_COMMIT=EXACT_40_CHARACTER_CORE_COMMIT
-export CODY_SRE_IMAGE=ghcr.io/codyfactory/cody-runtime-sre@sha256:REAL_DIGEST
+export CODY_SRE_IMAGE=ghcr.io/codyfactory/cody-runtime-sre@sha256:58002eed1d9fd31fa2a538713da891c4fdad70483e6da13769ac11064287a4e4
 
 test ! -e "cody-execution-${CODY_CHART_VERSION}.tgz"
 git diff --check

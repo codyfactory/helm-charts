@@ -83,4 +83,13 @@ The result must be `string`. Use the reviewed CRD-apply procedure above when it 
 
 GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an owner default change, owner disconnect or operator unbind changes the selected connection. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
 
-Do not tag or publish 0.6.4 until `values.yaml` pins an execution image built from the final #97 implementation and `appVersion` names that release. The currently pinned image predates optional Workflow references and source readiness. This draft schema is not a runnable release with that image.
+Chart `0.6.4` pins images from Cody commit `e5a241118b312351029824b1d61922c361c5187e`, published as `0.6.4-e5a24111` for Linux AMD64 and ARM64. Its `appVersion` identifies that build. The chart package/index is published separately after the source PR merges.
+
+| Image | Immutable reference |
+| --- | --- |
+| execution | `ghcr.io/codyfactory/cody-execution@sha256:a054502280b0edb8691520ded1ae31336a8caf24ce18356d08c7cb9ba47e7934` |
+| general | `ghcr.io/codyfactory/cody-runtime-general@sha256:30a64ce3905819d3e12f33bbc89ea4107127d019ac614b0b143c794b8f39be3f` |
+| sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:58002eed1d9fd31fa2a538713da891c4fdad70483e6da13769ac11064287a4e4` |
+| control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:832a5c830ee692f70c595be56c378099985e519b678d23c7037afc11a3acc5f8` |
+
+Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
