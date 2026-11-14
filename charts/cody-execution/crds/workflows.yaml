@@ -13,6 +13,13 @@ spec:
     - name: v1alpha1
       served: true
       storage: true
+      additionalPrinterColumns:
+        - name: SourcesReady
+          type: string
+          jsonPath: '.status.conditions[?(@.type=="SourcesReady")].status'
+        - name: SourceReason
+          type: string
+          jsonPath: '.status.conditions[?(@.type=="SourcesReady")].reason'
       subresources:
         status: {}
       schema:
@@ -52,7 +59,7 @@ spec:
                       properties:
                         slack:
                           type: object
-                          required: [connectorRef, channelID]
+                          required: [channelID]
                           properties:
                             connectorRef:
                               type: string
@@ -96,8 +103,50 @@ spec:
                   maxLength: 63
                 github:
                   type: object
-                  required: [connectorRef, repository, "on", reporting]
+                  required: [repository, "on", reporting]
                   properties:
+                    commands:
+                      type: object
+                      properties:
+                        rerunAliases:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                            pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                        entries:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: map
+                          x-kubernetes-list-map-keys: [name]
+                          items:
+                            type: object
+                            required: [name, usage, who, description]
+                            properties:
+                              name:
+                                type: string
+                                enum: [review, re-review, waive]
+                              targetPattern:
+                                type: string
+                                maxLength: 1024
+                              usage:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              who:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              description:
+                                type: string
+                                minLength: 1
+                                maxLength: 1024
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
                     paths:
                       type: object
                       required: [onAllExcluded]
@@ -158,6 +207,7 @@ spec:
                           type: string
                           enum: [pass]
                     connectorRef:
+                      description: Select a named organization connection; omit to use its default GitHub connection.
                       type: string
                       minLength: 1
                       maxLength: 63
@@ -237,6 +287,48 @@ spec:
                   type: object
                   required: [checkName, baseBranch, actions]
                   properties:
+                    commands:
+                      type: object
+                      properties:
+                        rerunAliases:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: set
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                            pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                        entries:
+                          type: array
+                          maxItems: 32
+                          x-kubernetes-list-type: map
+                          x-kubernetes-list-map-keys: [name]
+                          items:
+                            type: object
+                            required: [name, usage, who, description]
+                            properties:
+                              name:
+                                type: string
+                                enum: [review, re-review, waive]
+                              targetPattern:
+                                type: string
+                                maxLength: 1024
+                              usage:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              who:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
+                              description:
+                                type: string
+                                minLength: 1
+                                maxLength: 1024
+                                pattern: '^[^\s\x00\r\n]([^\x00\r\n]*[^\s\x00\r\n])?$'
                     paths:
                       type: object
                       required: [onAllExcluded]
@@ -314,8 +406,10 @@ spec:
                         enum: [opened, reopened, ready_for_review, synchronize]
                 source:
                   type: object
-                  required: [provider, connectorID]
+                  required: [provider]
                   x-kubernetes-validations:
+                    - rule: "self.provider == 'slack' ? !has(self.connectorID) : has(self.connectorID) && !has(self.connectorRef)"
+                      message: Slack uses optional connectorRef; other providers require connectorID
                     - rule: has(self.resourceID) != has(self.channels)
                       message: Specify exactly one of resourceID or channels
                     - rule: "!has(self.channels) || self.provider == 'slack'"
@@ -329,6 +423,10 @@ spec:
                     provider:
                       type: string
                       enum: [github, slack, operator]
+                    connectorRef:
+                      type: string
+                      description: Named organization Slack connection; omitted uses the organization default
+                      pattern: '^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$'
                     connectorID:
                       type: string
                       minLength: 1
@@ -350,6 +448,66 @@ spec:
             status:
               type: object
               properties:
+                sourcesHash:
+                  type: string
+                sources:
+                  type: array
+                  maxItems: 256
+                  items:
+                    type: object
+                    required: [reason]
+                    properties:
+                      reason:
+                        type: string
+                        enum: [Accepted, Pending, ConnectorUnbound, PolicyDenied, Conflict, Invalid]
+                      message:
+                        type: string
+                      source:
+                        type: object
+                        required: [provider, connectorID, resourceID]
+                        properties:
+                          provider:
+                            type: string
+                          connectorID:
+                            type: string
+                          resourceID:
+                            type: string
+                      conflictingInstallations:
+                        type: array
+                        maxItems: 256
+                        items:
+                          type: string
+                conditions:
+                  type: array
+                  maxItems: 8
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys: [type]
+                  items:
+                    type: object
+                    required: [type, status, reason, message, lastTransitionTime]
+                    properties:
+                      type:
+                        type: string
+                        maxLength: 316
+                        pattern: '^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$'
+                      status:
+                        type: string
+                        enum: ["True", "False", Unknown]
+                      reason:
+                        type: string
+                        minLength: 1
+                        maxLength: 1024
+                        pattern: '^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$'
+                      message:
+                        type: string
+                        maxLength: 32768
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                        minimum: 0
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
                 schedule:
                   type: object
                   properties:
