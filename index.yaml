@@ -2,6 +2,15 @@ apiVersion: v1
 entries:
   cody-execution:
   - apiVersion: v2
+    appVersion: 0.6.4-9272b0cc
+    created: "2026-11-14T17:39:41.724836+04:00"
+    description: Cody execution plane and persistent Sandboxes
+    digest: 6f65ad8449a9c6252c1befd6d3dd20da36228a244b19f6b99a3038c7fed2df5c
+    name: cody-execution
+    urls:
+    - https://raw.githubusercontent.com/codyfactory/helm-charts/main/cody-execution-0.6.4.tgz
+    version: 0.6.4
+  - apiVersion: v2
     appVersion: 0.5.0
     created: "2026-11-11T14:04:56.262783+04:00"
     description: Cody execution plane and persistent Sandboxes
@@ -19,4 +28,4 @@ entries:
     urls:
     - https://raw.githubusercontent.com/codyfactory/helm-charts/main/cody-execution-0.5.0.tgz
     version: 0.5.0
-generated: "2026-11-11T14:04:56.261724+04:00"
+generated: "2026-11-14T17:39:41.720202+04:00"
