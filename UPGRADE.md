@@ -68,3 +68,32 @@ Within a compatible current installation, ordinary credential rotation preserves
 the generated runtime token and every receipt/Sandbox PVC. Use the installed
 chart version, disable initialization, restart `<release>-execution-plane`,
 confirm fresh authentication and a successful test, then revoke the predecessor.
+
+## Organization source authorization
+
+The candidate 0.6.4 schema accompanies [Cody #97](https://github.com/codyfactory/cody/pull/97). Apply its CRDs through GitOps before the matching controller rollout: Helm upgrades do not update existing CRDs. An older Workflow CRD silently prunes `status.sources`, `status.conditions`, and `status.sourcesHash`; readiness never appears and the controller repeatedly patches status.
+
+Stop all old control-plane writers before starting any replacement control-plane process; do not overlap versions through a rolling update. This includes API, gateway, connectors and reconciliation roles. Migration 053 moves legacy report queues, and startup repeats the move before shared workers start to recover jobs inserted between migration and shutdown. That repair is not a compatibility service for old processes that continue enqueueing after startup.
+
+The pre-release migrations in #97 are edited in place: 049 and 051 retain a defaults row with a nullable selected ID, and Slack OAuth recovery is migration 054. Recreate disposable databases initialized from superseded #97 candidates; this is not an incremental upgrade from those candidate schemas.
+
+Verify the live schema before updating the controller:
+
+```sh
+kubectl get crd workflows.execution.cody.so -o jsonpath='{.spec.versions[?(@.name=="v1alpha1")].schema.openAPIV3Schema.properties.status.properties.sourcesHash.type}'
+```
+
+The result must be `string`. Use the reviewed CRD-apply procedure above when it is missing. Existing `workflows/status` permissions cover these updates.
+
+GitHub Workflows and Agent `auth.githubApp` may omit `connectorRef`. Slack Workflows and schedule reporting use the same organization-default resolution. An explicit invalid reference fails closed. A provider-revoked default stays selected and fails closed; only an owner's audited `SetDefault` selects a different connection. Owner disconnect or operator unbind of the default clears it and leaves unqualified Workflows `ConnectorUnbound` until an owner calls `SetDefault`. Only the organization's first-ever connection for each provider becomes default automatically; later connects never restore a cleared default, even after all prior bindings were removed. Coordinate the control and execution planes; old connector flags and operator grant APIs are removed, and old grants are not copied.
+
+Execution chart `0.6.4` pins rebuilt execution/runtime images from Cody commit `9272b0cc54df1340c87a2508d7887c3ad8872960`, build `0.6.4-9272b0cc`. This execution build keeps temporary Slack source and schedule-reporting lookup failures retryable during admission. Subscription and status synchronization still isolate failed lookups. The control-plane image retains the nullable-default build from `2126ab5d31325d140aeb84e5bda7cf24ba3ec84d` as `0.6.4-2126ab5d`, pinned by control-plane chart `0.4.0`. Both builds support Linux AMD64 and ARM64; each chart appVersion identifies its corresponding image build. The chart package/index is published separately after the source PR merges.
+
+| Image | Immutable reference |
+| --- | --- |
+| execution | `ghcr.io/codyfactory/cody-execution@sha256:810051eeaa4dbfce6f505579effaa9f2fab568c818ead331496a4d4fd0bdc03d` |
+| general | `ghcr.io/codyfactory/cody-runtime-general@sha256:5833e510c64e0d9aeb99c718a16d9102509448ec9cc8a337d0d8bb12a671065c` |
+| sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:b584cc7d73c2d96d437e79be5011f360eceedac12dba73b200ff107d106057ef` |
+| control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:4c9c432011baa80712a8245a68c6548c4c14d1edee9171377c6c275c377ade11` |
+
+Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
