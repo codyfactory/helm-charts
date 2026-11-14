@@ -408,6 +408,29 @@ overshoot. Reviews, finding replies and scheduled fresh occurrences use bounded
 PVC size and storage class remain fixed. See the
 [storage and acceptance guide](https://github.com/codyfactory/cody/blob/feat/sandbox-policy/hack/planes/SANDBOX-STORAGE.md).
 
+### Scheduled session controls
+
+A scheduled Workflow with `spec.sandbox.continuity: reuse` can set
+`spec.schedule.session.ttl` to limit the lifetime of its retained native session.
+The duration starts at the first admitted tick. For example, `24h` expires one
+day after admission. The next eligible tick opens a new session. Omitting the
+TTL allows the existing retention policy to govern the session.
+
+Set `spec.schedule.reporting.slack.mode: sessionThread` to group each session's
+reports beneath a stable Slack parent. Enable `followUps: true` in that Slack
+block to allow mentions in the thread to queue turns in the same session. The
+normal Slack invocation grants apply. Pausing ticks leaves enabled follow-ups
+available. Withdrawing the Workflow closes both entry points.
+
+Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
+images before enabling these controls. See [UPGRADE.md](UPGRADE.md).
+
+Before unpausing a managed Workflow, verify that the running
+execution controller uses the matching image and that the hosted plane has
+acknowledged the exact Workflow generation and controls in
+`status.schedule.policy`. An applied CRD and a generic observed generation
+alone cannot establish compatibility with an older controller.
+
 ## Workflow source status
 
 Workflows report source authorization and conflicts through `status.sources`, `SourcesReady`, and the `SourcesReady`/`SourceReason` printer columns. See [the coordinated source-authorization upgrade](UPGRADE.md#organization-source-authorization) before using these fields or optional connector references.

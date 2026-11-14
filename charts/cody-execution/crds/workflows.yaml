@@ -39,6 +39,12 @@ spec:
                   message: A scheduled Workflow requires explicit sandbox continuity
                 - rule: "!has(self.sandbox) || has(self.schedule)"
                   message: Explicit sandbox continuity requires a schedule
+                - rule: >-
+                    !has(self.schedule) ||
+                    ((!has(self.schedule.session) &&
+                    (!has(self.schedule.reporting.slack.mode) || self.schedule.reporting.slack.mode != 'sessionThread')) ||
+                    (has(self.sandbox) && self.sandbox.continuity == 'reuse'))
+                  message: Scheduled session TTL and threaded reporting require reusable sandbox continuity
               properties:
                 sandbox:
                   type: object
@@ -51,6 +57,18 @@ spec:
                   type: object
                   required: [cron, timezone, policies, reporting]
                   properties:
+                    session:
+                      type: object
+                      required: [ttl]
+                      properties:
+                        ttl:
+                          type: string
+                          minLength: 2
+                          maxLength: 64
+                          pattern: '^([0-9]+(\.[0-9]{1,3})?(h|m|s)|[0-9]+ms)+$'
+                          x-kubernetes-validations:
+                            - rule: "duration(self) >= duration('60s') && duration(self) <= duration('720h') && duration(self).getMilliseconds() % 1000 == 0"
+                              message: Session TTL must be a whole number of seconds between one minute and thirty days
                     reporting:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
@@ -60,7 +78,16 @@ spec:
                         slack:
                           type: object
                           required: [channelID]
+                          x-kubernetes-validations:
+                            - rule: "!has(self.followUps) || !self.followUps || (has(self.mode) && self.mode == 'sessionThread')"
+                              message: Slack follow-ups require sessionThread reporting
                           properties:
+                            mode:
+                              type: string
+                              enum: [sessionThread]
+                            followUps:
+                              type: boolean
+                              default: false
                             connectorRef:
                               type: string
                               pattern: '^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$'
@@ -511,12 +538,40 @@ spec:
                 schedule:
                   type: object
                   properties:
+                    policy:
+                      description: Managed schedule controls acknowledged by the hosted plane for this Workflow generation.
+                      type: object
+                      properties:
+                        ttlSeconds:
+                          type: integer
+                          format: int64
+                          minimum: 60
+                          maximum: 2592000
+                        threaded:
+                          type: boolean
+                        followUps:
+                          type: boolean
                     nextFireTime:
                       type: string
                       format: date-time
+                    session:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        openedAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+                        closedReason:
+                          type: string
                     latest:
                       type: object
                       properties:
+                        sessionID:
+                          type: string
                         commandID:
                           type: string
                         nominalTime:
