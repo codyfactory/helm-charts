@@ -419,15 +419,19 @@ mention is admitted. Without a TTL, the normal retention policy applies.
 
 Set `spec.schedule.reporting.slack.threads: session` to group each session's
 reports beneath an editable Slack parent. The parent shows the latest check
-status. Status changes, including recovery from a missing or failed health
-result, can broadcast. Repeated identical results stay in the thread. Omit
-`threads` or set `perRun` for one report per occurrence.
+status. When Cody cannot confirm an attempted parent post after checking Slack,
+the next reportable tick can establish a new parent for that session. A
+definitive pre-start failure can open the parent with an error, and missed or
+expired ticks can update a verified parent. A transition into a streak of
+missing or failed results can broadcast once, and recovery can broadcast once.
+The latest occurrence also exposes its health status and headline.
+Omit `threads` or set `perRun` for one report per occurrence.
 
-Set `followUps: true` in the Slack block to allow authorized mentions. While the
-original session is active, the mention resumes that exact session. If that
-session ended because of TTL, a mention can use or open the Workflow's current
-session and still reply in the original thread. Threads closed for other reasons
-refuse follow-ups. Pausing ticks leaves enabled follow-ups available.
+Set `followUps: true` in the Slack block to allow authorized mentions from a
+verified thread. Cody uses the current session and Agent for the same Workflow
+and replies in the original thread. The Workspace and channel must match the
+Workflow's current reporting destination. A replacement Workflow has its own
+threads. Pausing ticks leaves enabled follow-ups available.
 
 Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
 images before enabling these controls. See [UPGRADE.md](UPGRADE.md).

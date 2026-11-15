@@ -9,6 +9,7 @@ spec:
   schedule:
     cron: "17,47 * * * *"
     timezone: UTC
+    # Unpause after verifying the Workflow status and Slack destination.
     paused: true
     policies:
       missedRun: skip
@@ -21,4 +22,5 @@ spec:
         connectorRef: team-slack
         channelID: C12345678
         threads: session
+        # Mentions in verified threads use the current Workflow session.
         followUps: true

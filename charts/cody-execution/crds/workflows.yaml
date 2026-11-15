@@ -590,6 +590,11 @@ spec:
                           type: string
                         sandboxResetReason:
                           type: string
+                        healthStatus:
+                          type: string
+                          enum: [healthy, degraded, unhealthy, error, unknown]
+                        healthHeadline:
+                          type: string
                 resolved:
                   type: boolean
                 reason:
