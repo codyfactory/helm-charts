@@ -412,18 +412,22 @@ PVC size and storage class remain fixed. See the
 
 A scheduled Workflow with `spec.sandbox.continuity: reuse` can set
 `spec.schedule.session.ttl` to limit the lifetime of its retained native session.
-The duration starts at the first admitted tick. For example, `24h` expires one
-day after admission. The next eligible tick opens a new session. Omitting the
-TTL allows the existing retention policy to govern the session.
+When a tick opens a session, the duration starts at that tick's scheduled time.
+For example, `24h` on a fixed daily UTC schedule expires at the next scheduled
+time. If a Slack follow-up opens the successor first, TTL starts when that
+mention is admitted. Without a TTL, the normal retention policy applies.
 
 Set `spec.schedule.reporting.slack.threads: session` to group each session's
 reports beneath an editable Slack parent. The parent shows the latest check
-status. Changed, failed and missing health results are broadcast once in the
-channel. Omit this field or set `perRun` for one report per occurrence. Enable `followUps: true` in that Slack
-block to allow mentions in the thread to queue turns in the same session. The
-normal organization Slack source policy applies. Pausing ticks leaves enabled follow-ups
-available. A mention on an ended thread cannot open the successor session.
-Withdrawing the Workflow closes both entry points.
+status. Status changes, including recovery from a missing or failed health
+result, can broadcast. Repeated identical results stay in the thread. Omit
+`threads` or set `perRun` for one report per occurrence.
+
+Set `followUps: true` in the Slack block to allow authorized mentions. While the
+original session is active, the mention resumes that exact session. If that
+session ended because of TTL, a mention can use or open the Workflow's current
+session and still reply in the original thread. Threads closed for other reasons
+refuse follow-ups. Pausing ticks leaves enabled follow-ups available.
 
 Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
 images before enabling these controls. See [UPGRADE.md](UPGRADE.md).
