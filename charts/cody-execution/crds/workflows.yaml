@@ -42,7 +42,7 @@ spec:
                 - rule: >-
                     !has(self.schedule) ||
                     ((!has(self.schedule.session) &&
-                    (!has(self.schedule.reporting.slack.mode) || self.schedule.reporting.slack.mode != 'sessionThread')) ||
+                    (!has(self.schedule.reporting.slack.threads) || self.schedule.reporting.slack.threads != 'session')) ||
                     (has(self.sandbox) && self.sandbox.continuity == 'reuse'))
                   message: Scheduled session TTL and threaded reporting require reusable sandbox continuity
               properties:
@@ -79,12 +79,13 @@ spec:
                           type: object
                           required: [channelID]
                           x-kubernetes-validations:
-                            - rule: "!has(self.followUps) || !self.followUps || (has(self.mode) && self.mode == 'sessionThread')"
-                              message: Slack follow-ups require sessionThread reporting
+                            - rule: "!has(self.followUps) || !self.followUps || (has(self.threads) && self.threads == 'session')"
+                              message: Slack follow-ups require session threading
                           properties:
-                            mode:
+                            threads:
                               type: string
-                              enum: [sessionThread]
+                              enum: [perRun, session]
+                              default: perRun
                             followUps:
                               type: boolean
                               default: false

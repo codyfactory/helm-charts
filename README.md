@@ -416,11 +416,14 @@ The duration starts at the first admitted tick. For example, `24h` expires one
 day after admission. The next eligible tick opens a new session. Omitting the
 TTL allows the existing retention policy to govern the session.
 
-Set `spec.schedule.reporting.slack.mode: sessionThread` to group each session's
-reports beneath a stable Slack parent. Enable `followUps: true` in that Slack
+Set `spec.schedule.reporting.slack.threads: session` to group each session's
+reports beneath an editable Slack parent. The parent shows the latest check
+status. Changed, failed and missing health results are broadcast once in the
+channel. Omit this field or set `perRun` for one report per occurrence. Enable `followUps: true` in that Slack
 block to allow mentions in the thread to queue turns in the same session. The
-normal Slack invocation grants apply. Pausing ticks leaves enabled follow-ups
-available. Withdrawing the Workflow closes both entry points.
+normal organization Slack source policy applies. Pausing ticks leaves enabled follow-ups
+available. A mention on an ended thread cannot open the successor session.
+Withdrawing the Workflow closes both entry points.
 
 Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
 images before enabling these controls. See [UPGRADE.md](UPGRADE.md).

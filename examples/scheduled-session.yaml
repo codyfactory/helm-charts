@@ -20,5 +20,5 @@ spec:
       slack:
         connectorRef: team-slack
         channelID: C12345678
-        mode: sessionThread
+        threads: session
         followUps: true
