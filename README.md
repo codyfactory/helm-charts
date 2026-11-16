@@ -408,6 +408,40 @@ overshoot. Reviews, finding replies and scheduled fresh occurrences use bounded
 PVC size and storage class remain fixed. See the
 [storage and acceptance guide](https://github.com/codyfactory/cody/blob/feat/sandbox-policy/hack/planes/SANDBOX-STORAGE.md).
 
+### Scheduled session controls
+
+A scheduled Workflow with `spec.sandbox.continuity: reuse` can set
+`spec.schedule.session.ttl` to limit the lifetime of its retained native session.
+When a tick opens a session, the duration starts at that tick's scheduled time.
+For example, `24h` on a fixed daily UTC schedule expires at the next scheduled
+time. If a Slack follow-up opens the successor first, TTL starts when that
+mention is admitted. Without a TTL, the normal retention policy applies.
+
+Set `spec.schedule.reporting.slack.threads: session` to group each session's
+reports beneath an editable Slack parent. The parent shows the latest check
+status. When Cody cannot confirm an attempted parent post after checking Slack,
+the next reportable tick can establish a new parent for that session. A
+definitive pre-start failure can open the parent with an error, and missed or
+expired ticks can update a verified parent. A transition into a streak of
+missing or failed results can broadcast once, and recovery can broadcast once.
+The latest occurrence also exposes its health status and headline.
+Omit `threads` or set `perRun` for one report per occurrence.
+
+Set `followUps: true` in the Slack block to allow authorized mentions from a
+verified thread. Cody uses the current session and Agent for the same Workflow
+and replies in the original thread. The Workspace and channel must match the
+Workflow's current reporting destination. A replacement Workflow has its own
+threads. Pausing ticks leaves enabled follow-ups available.
+
+Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
+images before enabling these controls. See [UPGRADE.md](UPGRADE.md).
+
+Before unpausing a managed Workflow, verify that the running
+execution controller uses the matching image and that the hosted plane has
+acknowledged the exact Workflow generation and controls in
+`status.schedule.policy`. An applied CRD and a generic observed generation
+alone cannot establish compatibility with an older controller.
+
 ## Workflow source status
 
 Workflows report source authorization and conflicts through `status.sources`, `SourcesReady`, and the `SourcesReady`/`SourceReason` printer columns. See [the coordinated source-authorization upgrade](UPGRADE.md#organization-source-authorization) before using these fields or optional connector references.
