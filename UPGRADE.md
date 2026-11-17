@@ -114,6 +114,9 @@ runtime images support the new report contract and that the hosted plane has
 acknowledged the exact Workflow generation and effective `status.schedule.policy`.
 
 Existing parent timestamps, receipts and pending Slack reports travel with the
-installation. To roll back, pause the migrated Workflow and restore its earlier
+installation. A session with an existing parent keeps its presentation until
+rollover. A new simplified session creates a status parent on its first
+reportable completion and replies in that thread for each result.
+To roll back, pause the migrated Workflow and restore its earlier
 configuration before starting an older execution image. Allow reports and turns
 admitted under the new contract to settle on a compatible build.

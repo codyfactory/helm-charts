@@ -417,8 +417,10 @@ next day's tick. Without a TTL, normal retention applies.
 
 Omit `spec.schedule.reporting` for a schedule that records outcomes in Workflow
 status. With a Slack destination and reusable continuity, omit `threads` to
-post the first result as the session's parent and later results as thread
-replies. Missed or skipped ticks appear in Workflow status. Explicit
+create a short Slack status parent when the first reportable tick finishes.
+Every tick result appears in that thread, and later ticks update the parent
+with the latest execution status and scheduled time. Missed or skipped ticks
+appear in Workflow status. Explicit
 `threads: perRun` and `threads: session` retain the previous report formats
 during migration. Fresh schedules with Slack report independently per run.
 
