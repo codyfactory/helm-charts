@@ -97,3 +97,23 @@ Execution chart `0.6.4` pins rebuilt execution/runtime images from Cody commit `
 | control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:4c9c432011baa80712a8245a68c6548c4c14d1edee9171377c6c275c377ade11` |
 
 Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
+
+
+## Simplified cron reporting
+
+Inventory reusable Workflow manifests before applying the updated CRD
+and compatible hosted, execution and runtime images. The 0.6.5 CRD can
+populate `threads: perRun` and `followUps: false` for omitted fields.
+Keep explicit legacy `threads` settings until the Workflow owner migrates them.
+
+To migrate a reusable schedule, omit `reporting` for Workflow status only, or
+keep its Slack destination and remove its explicit `threads` field. Omit
+`followUps` to enable authorized cron joins, and preserve `followUps: false`
+for a deliberate opt-out. Before unpausing, confirm that the execution and
+runtime images support the new report contract and that the hosted plane has
+acknowledged the exact Workflow generation and effective `status.schedule.policy`.
+
+Existing parent timestamps, receipts and pending Slack reports travel with the
+installation. To roll back, pause the migrated Workflow and restore its earlier
+configuration before starting an older execution image. Allow reports and turns
+admitted under the new contract to settle on a compatible build.

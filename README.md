@@ -410,37 +410,27 @@ PVC size and storage class remain fixed. See the
 
 ### Scheduled session controls
 
-A scheduled Workflow with `spec.sandbox.continuity: reuse` can set
-`spec.schedule.session.ttl` to limit the lifetime of its retained native session.
-When a tick opens a session, the duration starts at that tick's scheduled time.
-For example, `24h` on a fixed daily UTC schedule expires at the next scheduled
-time. If a Slack follow-up opens the successor first, TTL starts when that
-mention is admitted. Without a TTL, the normal retention policy applies.
+Set `spec.sandbox.continuity: reuse` to keep a native conversation across ticks.
+The optional `spec.schedule.session.ttl` starts at the first admitted tick's
+scheduled time. For example, `24h` on a fixed daily UTC schedule expires at the
+next day's tick. Without a TTL, normal retention applies.
 
-Set `spec.schedule.reporting.slack.threads: session` to group each session's
-reports beneath an editable Slack parent. The parent shows the latest check
-status. When Cody cannot confirm an attempted parent post after checking Slack,
-the next reportable tick can establish a new parent for that session. A
-definitive pre-start failure can open the parent with an error, and missed or
-expired ticks can update a verified parent. A transition into a streak of
-missing or failed results can broadcast once, and recovery can broadcast once.
-The latest occurrence also exposes its health status and headline.
-Omit `threads` or set `perRun` for one report per occurrence.
+Omit `spec.schedule.reporting` for a schedule that records outcomes in Workflow
+status. With a Slack destination and reusable continuity, omit `threads` to
+post the first result as the session's parent and later results as thread
+replies. Missed or skipped ticks appear in Workflow status. Explicit
+`threads: perRun` and `threads: session` retain the previous report formats
+during migration. Fresh schedules with Slack report independently per run.
 
-Set `followUps: true` in the Slack block to allow authorized mentions from a
-verified thread. Cody uses the current session and Agent for the same Workflow
-and replies in the original thread. The Workspace and channel must match the
-Workflow's current reporting destination. A replacement Workflow has its own
-threads. Pausing ticks leaves enabled follow-ups available.
+In the simplified threaded mode, authorized mentions in a verified Workflow
+thread use its current eligible session. The reply goes to the incoming thread.
+When there is no eligible cron session, the ordinary Slack route applies if
+one is configured. Set `followUps: false` to opt out of joining the cron
+session. Pausing ticks leaves enabled follow-ups available until expiry.
 
 Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
-images before enabling these controls. See [UPGRADE.md](UPGRADE.md).
+images before migrating Workflows. See [UPGRADE.md](UPGRADE.md).
 
-Before unpausing a managed Workflow, verify that the running
-execution controller uses the matching image and that the hosted plane has
-acknowledged the exact Workflow generation and controls in
-`status.schedule.policy`. An applied CRD and a generic observed generation
-alone cannot establish compatibility with an older controller.
 
 ## Workflow source status
 
