@@ -117,7 +117,7 @@ Existing parent timestamps, receipts and pending Slack reports travel with the
 installation. A session with an existing parent keeps its presentation until
 rollover. A new simplified session creates a status parent on its first
 reportable completion and replies in that thread for each result.
-To roll back to a worker without plain schedule support:
+To restore an earlier Workflow policy:
 
 1. Keep the compatible controller running. Pause the migrated Workflows and
    let turns and reports admitted under the newer contract settle on the
@@ -148,6 +148,12 @@ To roll back to a worker without plain schedule support:
    The command fails while any hosted schedule still uses `plainReport`.
    `status.schedule.policy` can show the same TTL, threading and follow-up
    values for both modes. The subscription response verifies the mode.
-3. Switch to the older execution image after the hosted check succeeds. If
-   acknowledgement is delayed, keep the compatible controller running and
-   inspect the affected Workflow's source status before replacing the worker.
+3. Resume the restored policy on a compatible execution image. If
+   acknowledgement is delayed, keep the Workflows paused and inspect their
+   source status.
+
+The hosted check confirms the active policy. A retained receipt journal can
+still contain plain schedule receipts and exact cron follow-up targets,
+including completed turns. Keep an execution image that preserves both fields
+in restore census and control messages for as long as the installation retains
+that evidence. Preserve the receipt volume during policy rollback.
