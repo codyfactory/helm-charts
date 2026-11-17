@@ -117,6 +117,37 @@ Existing parent timestamps, receipts and pending Slack reports travel with the
 installation. A session with an existing parent keeps its presentation until
 rollover. A new simplified session creates a status parent on its first
 reportable completion and replies in that thread for each result.
-To roll back, pause the migrated Workflow and restore its earlier
-configuration before starting an older execution image. Allow reports and turns
-admitted under the new contract to settle on a compatible build.
+To roll back to a worker without plain schedule support:
+
+1. Keep the compatible controller running. Pause the migrated Workflows and
+   let turns and reports admitted under the newer contract settle on the
+   compatible build. Restore the earlier reporting configuration with the
+   Workflows paused.
+2. Wait for the hosted subscription acknowledgement of the restored Workflow
+   UIDs, generations and effective policies. Use the installation-authenticated
+   `GetSubscriptions` RPC to check the full advertisement for that installation.
+
+   Set `CODY_API_ORIGIN` to the hosted API origin and
+   `CODY_INSTALLATION_HEADER` to a private file containing the installation's
+   `Authorization: Bearer …` header.
+
+   ```sh
+   set -o pipefail
+   curl --fail --silent --show-error --max-time 30 \
+     -H @"${CODY_INSTALLATION_HEADER:?}" \
+     -H 'Content-Type: application/json' --data '{}' \
+     "${CODY_API_ORIGIN:?}/installation.v1.InstallationService/GetSubscriptions" |
+     jq -e '{
+       schedules: [(.schedules // [])[] |
+         {source, workflowUid, workflowGeneration, paused, threaded, followUps, plainReport}],
+       scheduleStatuses: (.scheduleStatuses // [])
+     } | select(all(.schedules[]; .plainReport != true))'
+   ```
+
+   Compare the returned generations and statuses with the restored manifests.
+   The command fails while any hosted schedule still uses `plainReport`.
+   `status.schedule.policy` can show the same TTL, threading and follow-up
+   values for both modes. The subscription response verifies the mode.
+3. Switch to the older execution image after the hosted check succeeds. If
+   acknowledgement is delayed, keep the compatible controller running and
+   inspect the affected Workflow's source status before replacing the worker.
