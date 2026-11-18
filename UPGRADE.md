@@ -142,3 +142,15 @@ Built from Cody commit `d7ae1ef22786bd24fd8729c2fcd934b5140255e0` for the protoc
 | cody-execution | `ghcr.io/codyfactory/cody-execution@sha256:3ff4bfcfcf30513f6700920d85b7982a37488280de826c05029f111c844dbef9` |
 | cody-runtime-general | `ghcr.io/codyfactory/cody-runtime-general@sha256:29e958a368c78ff6a98ff2cf5d64e3cc1bc7635a14bf1650340c6e5052b11322` |
 | cody-runtime-sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:689e8d9524d2b744f42864eeefaa4a6b4c54d5cbfed10bd7a1590d53a1f4b323` |
+
+### Chart 0.6.7 release images
+
+Built from Cody commit `cf6cf88308d7221cbc09218666eb39e455ea28c9`. Delivery protocol 4 and runtime-image protocol 2 are unchanged from 0.6.6, and the CRDs are identical.
+
+GitHub Workflow admission is now the only review intake ([Cody #133](https://github.com/codyfactory/cody/pull/133)). A Workflow whose `spec.source` names GitHub without a `spec.github` or `spec.githubWorkflow` declaration reports `Invalid`; declare the route on the Workflow. The hosted control plane no longer accepts `--github-workflows` or `--github-check-name`, so remove both from its command in the same rollout.
+
+| Image | Immutable reference |
+| --- | --- |
+| cody-execution | `ghcr.io/codyfactory/cody-execution@sha256:9f0f4e564cce3153e38aa4aaab794937bae43d54c1059a7647883a873f8574f3` |
+| cody-runtime-general | `ghcr.io/codyfactory/cody-runtime-general@sha256:38ffb917a2ef55f3aad9f4eb54072486153f810de459cce9cf1bacca693855cc` |
+| cody-runtime-sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:9fe2bbb14a7fd1651cd151cd4ed90c85cbd8a5ad85f693071825c023478e4d87` |
