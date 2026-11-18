@@ -132,3 +132,13 @@ existing development installation and core database state.
 Historical messages keep their Slack timestamps but have no cron binding after
 the reset. A return to an earlier binary requires another clean reset and
 installation. Use the existing release tools and explicit target commands.
+
+### Chart 0.6.6 release images
+
+Built from Cody commit `d7ae1ef22786bd24fd8729c2fcd934b5140255e0` for the protocol 4 cron cutover.
+
+| Image | Immutable reference |
+| --- | --- |
+| cody-execution | `ghcr.io/codyfactory/cody-execution@sha256:3ff4bfcfcf30513f6700920d85b7982a37488280de826c05029f111c844dbef9` |
+| cody-runtime-general | `ghcr.io/codyfactory/cody-runtime-general@sha256:29e958a368c78ff6a98ff2cf5d64e3cc1bc7635a14bf1650340c6e5052b11322` |
+| cody-runtime-sre | `ghcr.io/codyfactory/cody-runtime-sre@sha256:689e8d9524d2b744f42864eeefaa4a6b4c54d5cbfed10bd7a1590d53a1f4b323` |
