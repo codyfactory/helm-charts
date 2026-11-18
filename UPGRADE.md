@@ -48,7 +48,7 @@ Execution reads its installation token at startup, so the explicit restart above
 
 For existing-Secret mode, update only the customer-owned installation Secret using your secret manager/file input. Then use the same explicit rollout restart/status sequence and verify fresh connectivity before revoking the predecessor. Do not switch to inline mode or rotate the runtime/Attach Secret. Reinstalling with lost Helm metadata, retained claims or a missing runtime Secret requires explicit diagnosis, not adoption or fresh initialization. Helm uninstall leaves StatefulSet-generated PVCs, but do not rely on uninstall as a migration procedure.
 
-## Greenfield Sandbox baseline
+## Previous greenfield Sandbox baseline
 
 The current baseline uses installation delivery protocol 3 and runtime-image
 protocol 2. Core defines fresh Sandbox PostgreSQL schemas directly through 038;
@@ -97,3 +97,38 @@ Execution chart `0.6.4` pins rebuilt execution/runtime images from Cody commit `
 | control-plane | `ghcr.io/codyfactory/cody-control-plane@sha256:4c9c432011baa80712a8245a68c6548c4c14d1edee9171377c6c275c377ade11` |
 
 Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
+
+
+## Cron hard cutover
+
+The cron implementation now has one output and reporting contract. The old
+`threads` selector, structured health output, broadcasts, old journal decoding
+and cron capability negotiation are removed. This preview cutover discards the
+existing development installation and core database state.
+
+1. Identify the exact Fly apps/core database, Kubernetes context, namespace,
+   Helm release and installation. Stop scheduled work, connector intake, hosted
+   writers, execution controllers and sandboxes.
+2. Remove the target development installation's Helm workloads, Workflows,
+   generated sandboxes and both receipt/workspace PVCs. Recreate its core
+   development database. Identify shared consumers before changing CRDs or
+   cluster-scoped RBAC. Shared auth databases and unrelated workloads are
+   outside the installation reset.
+3. Build and deploy matching control-plane, execution and native runtime images
+   from the same revision. Rebuild customer derivatives such as `cody-debug`.
+   Native images contain the runtime Attach client and must use the required
+   protocol revision too. Publish matching release digest pins and this chart.
+4. Apply the new Workflow CRD, enroll a new installation and install with fresh
+   credentials and a new initialized receipt journal. Recreate its Agent,
+   broker profiles, access policies and test Slack connection/channel grant.
+5. Use `continuity: reuse` for shared cron sessions, optional session TTL and
+   authorized mentions. Remove `reporting.slack.threads`. Omit `followUps` to
+   enable joins or set it false to disable them. Use `continuity: fresh` for
+   independent per-occurrence sandboxes and result threads.
+6. Verify two ticks share a status parent and native session, queue a mention,
+   verify retained context, observe TTL rollover and test ordinary Slack
+   routing when no cron session remains. Test first in `#cody-v2`.
+
+Historical messages keep their Slack timestamps but have no cron binding after
+the reset. A return to an earlier binary requires another clean reset and
+installation. Use the existing release tools and explicit target commands.

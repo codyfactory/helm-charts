@@ -2,9 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-Chart `0.6.3` is available from the public Helm index alongside `0.5.0`. It adds AccessProfile configuration and Sandbox placement and storage defaults.
-
-Candidate chart `0.6.4` adds organization source authorization and pins the `0.6.4-9272b0cc` image build. See [UPGRADE.md](UPGRADE.md) for the coordinated control/execution cutover and image digests.
+Chart `0.6.6` is an unpublished candidate for the cron hard cutover. It requires matching delivery protocol 4 hosted, execution and native runtime images. Before publishing the package, replace the execution, broker and onboarding image defaults with the verified digests built from the paired Cody change. The source defaults are release placeholders, not a supported mixed-version deployment. See [UPGRADE.md](UPGRADE.md#cron-hard-cutover) for the clean dev installation procedure.
 
 ## Install
 
@@ -410,37 +408,31 @@ PVC size and storage class remain fixed. See the
 
 ### Scheduled session controls
 
-A scheduled Workflow with `spec.sandbox.continuity: reuse` can set
-`spec.schedule.session.ttl` to limit the lifetime of its retained native session.
-When a tick opens a session, the duration starts at that tick's scheduled time.
-For example, `24h` on a fixed daily UTC schedule expires at the next scheduled
-time. If a Slack follow-up opens the successor first, TTL starts when that
-mention is admitted. Without a TTL, the normal retention policy applies.
+Set `spec.sandbox.continuity: reuse` to share one native conversation across cron
+ticks. The optional `spec.schedule.session.ttl` starts at the first admitted
+tick's nominal time. Without TTL, normal retention applies. A tick opens the
+next session after expiry or retirement.
 
-Set `spec.schedule.reporting.slack.threads: session` to group each session's
-reports beneath an editable Slack parent. The parent shows the latest check
-status. When Cody cannot confirm an attempted parent post after checking Slack,
-the next reportable tick can establish a new parent for that session. A
-definitive pre-start failure can open the parent with an error, and missed or
-expired ticks can update a verified parent. A transition into a streak of
-missing or failed results can broadcast once, and recovery can broadcast once.
-The latest occurrence also exposes its health status and headline.
-Omit `threads` or set `perRun` for one report per occurrence.
+Omit `spec.schedule.reporting` to record outcomes without Slack publication.
+With Slack reporting, the first reportable completion creates a short execution
+status parent and posts the full result in its thread. Later ticks update that
+parent in place and add their results as replies. Skipped, missed and unstarted
+occurrences appear in Workflow status.
 
-Set `followUps: true` in the Slack block to allow authorized mentions from a
-verified thread. Cody uses the current session and Agent for the same Workflow
-and replies in the original thread. The Workspace and channel must match the
-Workflow's current reporting destination. A replacement Workflow has its own
-threads. Pausing ticks leaves enabled follow-ups available.
+Set `continuity: fresh` for an independent sandbox on each occurrence. Each
+reportable occurrence uses the same status-parent/result-thread presentation.
+Fresh schedules cannot declare a session TTL or enable cron follow-ups.
+The removed `reporting.slack.threads` setting is rejected.
 
-Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
-images before enabling these controls. See [UPGRADE.md](UPGRADE.md).
+Authorized mentions in a reusable cron thread join the current eligible session
+and reply in their incoming thread. An older root can locate the same Workflow's
+current session. With no eligible target, the configured ordinary Slack route
+applies. Omitted `followUps` enables joins for reusable Slack schedules, and
+`followUps: false` disables them. Pause stops ticks while enabled follow-ups
+can continue in an eligible session.
 
-Before unpausing a managed Workflow, verify that the running
-execution controller uses the matching image and that the hosted plane has
-acknowledged the exact Workflow generation and controls in
-`status.schedule.policy`. An applied CRD and a generic observed generation
-alone cannot establish compatibility with an older controller.
+This release requires a clean development installation and coordinated hosted,
+execution and native runtime images. See [UPGRADE.md](UPGRADE.md#cron-hard-cutover).
 
 ## Workflow source status
 

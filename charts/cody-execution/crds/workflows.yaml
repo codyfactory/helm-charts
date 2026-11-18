@@ -39,12 +39,13 @@ spec:
                   message: A scheduled Workflow requires explicit sandbox continuity
                 - rule: "!has(self.sandbox) || has(self.schedule)"
                   message: Explicit sandbox continuity requires a schedule
+                - rule: "!has(self.schedule) || !has(self.schedule.session) || self.sandbox.continuity == 'reuse'"
+                  message: Scheduled session TTL requires reusable sandbox continuity
                 - rule: >-
-                    !has(self.schedule) ||
-                    ((!has(self.schedule.session) &&
-                    (!has(self.schedule.reporting.slack.threads) || self.schedule.reporting.slack.threads != 'session')) ||
-                    (has(self.sandbox) && self.sandbox.continuity == 'reuse'))
-                  message: Scheduled session TTL and threaded reporting require reusable sandbox continuity
+                    !has(self.schedule) || !has(self.schedule.reporting) ||
+                    !has(self.schedule.reporting.slack.followUps) || !self.schedule.reporting.slack.followUps ||
+                    self.sandbox.continuity == 'reuse'
+                  message: Slack follow-ups require reusable sandbox continuity
               properties:
                 sandbox:
                   type: object
@@ -55,7 +56,7 @@ spec:
                       enum: [fresh, reuse]
                 schedule:
                   type: object
-                  required: [cron, timezone, policies, reporting]
+                  required: [cron, timezone, policies]
                   properties:
                     session:
                       type: object
@@ -78,17 +79,14 @@ spec:
                         slack:
                           type: object
                           required: [channelID]
-                          x-kubernetes-validations:
-                            - rule: "!has(self.followUps) || !self.followUps || (has(self.threads) && self.threads == 'session')"
-                              message: Slack follow-ups require session threading
                           properties:
                             threads:
                               type: string
-                              enum: [perRun, session]
-                              default: perRun
+                              x-kubernetes-validations:
+                                - rule: "false"
+                                  message: Slack threads configuration was removed; reporting follows sandbox continuity
                             followUps:
                               type: boolean
-                              default: false
                             connectorRef:
                               type: string
                               pattern: '^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$'
@@ -548,8 +546,6 @@ spec:
                           format: int64
                           minimum: 60
                           maximum: 2592000
-                        threaded:
-                          type: boolean
                         followUps:
                           type: boolean
                     nextFireTime:
@@ -589,11 +585,6 @@ spec:
                         reason:
                           type: string
                         sandboxResetReason:
-                          type: string
-                        healthStatus:
-                          type: string
-                          enum: [healthy, degraded, unhealthy, error, unknown]
-                        healthHeadline:
                           type: string
                 resolved:
                   type: boolean

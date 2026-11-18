@@ -21,6 +21,3 @@ spec:
       slack:
         connectorRef: team-slack
         channelID: C12345678
-        threads: session
-        # Mentions in verified threads use the current Workflow session.
-        followUps: true
