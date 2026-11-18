@@ -2,7 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-Chart `0.6.6` pins image build `0.6.6-d7ae1ef22786`. It requires matching delivery protocol 4 hosted, execution and native images and a clean development installation. See [UPGRADE.md](UPGRADE.md#cron-hard-cutover) for the procedure and image pins.
+Chart `0.6.7` pins image build `0.6.7-cf6cf88308d7`. It requires matching delivery protocol 4 hosted, execution and native images and a clean development installation. See [UPGRADE.md](UPGRADE.md#cron-hard-cutover) for the procedure and image pins.
 
 ## Install
 
