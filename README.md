@@ -2,9 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-Chart `0.6.3` is available from the public Helm index alongside `0.5.0`. It adds AccessProfile configuration and Sandbox placement and storage defaults.
-
-Candidate chart `0.6.4` adds organization source authorization and pins the `0.6.4-9272b0cc` image build. See [UPGRADE.md](UPGRADE.md) for the coordinated control/execution cutover and image digests.
+Chart `0.6.6` is an unpublished candidate for the cron hard cutover. It requires matching delivery protocol 4 hosted, execution and native runtime images. Before publishing the package, replace the execution, broker and onboarding image defaults with the verified digests built from the paired Cody change. The source defaults are release placeholders, not a supported mixed-version deployment. See [UPGRADE.md](UPGRADE.md#cron-hard-cutover) for the clean dev installation procedure.
 
 ## Install
 
@@ -410,29 +408,31 @@ PVC size and storage class remain fixed. See the
 
 ### Scheduled session controls
 
-Set `spec.sandbox.continuity: reuse` to keep a native conversation across ticks.
-The optional `spec.schedule.session.ttl` starts at the first admitted tick's
-scheduled time. For example, `24h` on a fixed daily UTC schedule expires at the
-next day's tick. Without a TTL, normal retention applies.
+Set `spec.sandbox.continuity: reuse` to share one native conversation across cron
+ticks. The optional `spec.schedule.session.ttl` starts at the first admitted
+tick's nominal time. Without TTL, normal retention applies. A tick opens the
+next session after expiry or retirement.
 
-Omit `spec.schedule.reporting` for a schedule that records outcomes in Workflow
-status. With a Slack destination and reusable continuity, omit `threads` to
-create a short Slack status parent when the first reportable tick finishes.
-Every tick result appears in that thread, and later ticks update the parent
-with the latest execution status and scheduled time. Missed or skipped ticks
-appear in Workflow status. Explicit
-`threads: perRun` and `threads: session` retain the previous report formats
-during migration. Fresh schedules with Slack report independently per run.
+Omit `spec.schedule.reporting` to record outcomes without Slack publication.
+With Slack reporting, the first reportable completion creates a short execution
+status parent and posts the full result in its thread. Later ticks update that
+parent in place and add their results as replies. Skipped, missed and unstarted
+occurrences appear in Workflow status.
 
-In the simplified threaded mode, authorized mentions in a verified Workflow
-thread use its current eligible session. The reply goes to the incoming thread.
-When there is no eligible cron session, the ordinary Slack route applies if
-one is configured. Set `followUps: false` to opt out of joining the cron
-session. Pausing ticks leaves enabled follow-ups available until expiry.
+Set `continuity: fresh` for an independent sandbox on each occurrence. Each
+reportable occurrence uses the same status-parent/result-thread presentation.
+Fresh schedules cannot declare a session TTL or enable cron follow-ups.
+The removed `reporting.slack.threads` setting is rejected.
 
-Apply the updated Workflow CRD and deploy matching hosted, execution and runtime
-images before migrating Workflows. See [UPGRADE.md](UPGRADE.md).
+Authorized mentions in a reusable cron thread join the current eligible session
+and reply in their incoming thread. An older root can locate the same Workflow's
+current session. With no eligible target, the configured ordinary Slack route
+applies. Omitted `followUps` enables joins for reusable Slack schedules, and
+`followUps: false` disables them. Pause stops ticks while enabled follow-ups
+can continue in an eligible session.
 
+This release requires a clean development installation and coordinated hosted,
+execution and native runtime images. See [UPGRADE.md](UPGRADE.md#cron-hard-cutover).
 
 ## Workflow source status
 

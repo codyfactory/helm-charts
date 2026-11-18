@@ -48,7 +48,7 @@ Execution reads its installation token at startup, so the explicit restart above
 
 For existing-Secret mode, update only the customer-owned installation Secret using your secret manager/file input. Then use the same explicit rollout restart/status sequence and verify fresh connectivity before revoking the predecessor. Do not switch to inline mode or rotate the runtime/Attach Secret. Reinstalling with lost Helm metadata, retained claims or a missing runtime Secret requires explicit diagnosis, not adoption or fresh initialization. Helm uninstall leaves StatefulSet-generated PVCs, but do not rely on uninstall as a migration procedure.
 
-## Greenfield Sandbox baseline
+## Previous greenfield Sandbox baseline
 
 The current baseline uses installation delivery protocol 3 and runtime-image
 protocol 2. Core defines fresh Sandbox PostgreSQL schemas directly through 038;
@@ -99,61 +99,36 @@ Execution chart `0.6.4` pins rebuilt execution/runtime images from Cody commit `
 Execution, general and SRE images are public. The control-plane image remains private; control-plane chart `0.4.0` accepts existing registry credentials through `imagePullSecrets`. Coordinate both planes for this breaking cutover. No deployment is performed by publishing these images.
 
 
-## Simplified cron reporting
+## Cron hard cutover
 
-Inventory reusable Workflow manifests before applying the updated CRD
-and compatible hosted, execution and runtime images. The 0.6.5 CRD can
-populate `threads: perRun` and `followUps: false` for omitted fields.
-Keep explicit legacy `threads` settings until the Workflow owner migrates them.
+The cron implementation now has one output and reporting contract. The old
+`threads` selector, structured health output, broadcasts, old journal decoding
+and cron capability negotiation are removed. This preview cutover discards the
+existing development installation and core database state.
 
-To migrate a reusable schedule, omit `reporting` for Workflow status only, or
-keep its Slack destination and remove its explicit `threads` field. Omit
-`followUps` to enable authorized cron joins, and preserve `followUps: false`
-for a deliberate opt-out. Before unpausing, confirm that the execution and
-runtime images support the new report contract and that the hosted plane has
-acknowledged the exact Workflow generation and effective `status.schedule.policy`.
+1. Identify the exact Fly apps/core database, Kubernetes context, namespace,
+   Helm release and installation. Stop scheduled work, connector intake, hosted
+   writers, execution controllers and sandboxes.
+2. Remove the target development installation's Helm workloads, Workflows,
+   generated sandboxes and both receipt/workspace PVCs. Recreate its core
+   development database. Identify shared consumers before changing CRDs or
+   cluster-scoped RBAC. Shared auth databases and unrelated workloads are
+   outside the installation reset.
+3. Build and deploy matching control-plane, execution and native runtime images
+   from the same revision. Rebuild customer derivatives such as `cody-debug`.
+   Native images contain the runtime Attach client and must use the required
+   protocol revision too. Publish matching release digest pins and this chart.
+4. Apply the new Workflow CRD, enroll a new installation and install with fresh
+   credentials and a new initialized receipt journal. Recreate its Agent,
+   broker profiles, access policies and test Slack connection/channel grant.
+5. Use `continuity: reuse` for shared cron sessions, optional session TTL and
+   authorized mentions. Remove `reporting.slack.threads`. Omit `followUps` to
+   enable joins or set it false to disable them. Use `continuity: fresh` for
+   independent per-occurrence sandboxes and result threads.
+6. Verify two ticks share a status parent and native session, queue a mention,
+   verify retained context, observe TTL rollover and test ordinary Slack
+   routing when no cron session remains. Test first in `#cody-v2`.
 
-Existing parent timestamps, receipts and pending Slack reports travel with the
-installation. A session with an existing parent keeps its presentation until
-rollover. A new simplified session creates a status parent on its first
-reportable completion and replies in that thread for each result.
-To restore an earlier Workflow policy:
-
-1. Keep the compatible controller running. Pause the migrated Workflows and
-   let turns and reports admitted under the newer contract settle on the
-   compatible build. Restore the earlier reporting configuration with the
-   Workflows paused.
-2. Wait for the hosted subscription acknowledgement of the restored Workflow
-   UIDs, generations and effective policies. Use the installation-authenticated
-   `GetSubscriptions` RPC to check the full advertisement for that installation.
-
-   Set `CODY_API_ORIGIN` to the hosted API origin and
-   `CODY_INSTALLATION_HEADER` to a private file containing the installation's
-   `Authorization: Bearer …` header.
-
-   ```sh
-   set -o pipefail
-   curl --fail --silent --show-error --max-time 30 \
-     -H @"${CODY_INSTALLATION_HEADER:?}" \
-     -H 'Content-Type: application/json' --data '{}' \
-     "${CODY_API_ORIGIN:?}/installation.v1.InstallationService/GetSubscriptions" |
-     jq -e '{
-       schedules: [(.schedules // [])[] |
-         {source, workflowUid, workflowGeneration, paused, threaded, followUps, plainReport}],
-       scheduleStatuses: (.scheduleStatuses // [])
-     } | select(all(.schedules[]; .plainReport != true))'
-   ```
-
-   Compare the returned generations and statuses with the restored manifests.
-   The command fails while any hosted schedule still uses `plainReport`.
-   `status.schedule.policy` can show the same TTL, threading and follow-up
-   values for both modes. The subscription response verifies the mode.
-3. Resume the restored policy on a compatible execution image. If
-   acknowledgement is delayed, keep the Workflows paused and inspect their
-   source status.
-
-The hosted check confirms the active policy. A retained receipt journal can
-still contain plain schedule receipts and exact cron follow-up targets,
-including completed turns. Keep an execution image that preserves both fields
-in restore census and control messages for as long as the installation retains
-that evidence. Preserve the receipt volume during policy rollback.
+Historical messages keep their Slack timestamps but have no cron binding after
+the reset. A return to an earlier binary requires another clean reset and
+installation. Use the existing release tools and explicit target commands.
