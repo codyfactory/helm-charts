@@ -414,10 +414,18 @@ tick's nominal time. Without TTL, normal retention applies. A tick opens the
 next session after expiry or retirement.
 
 Omit `spec.schedule.reporting` to record outcomes without Slack publication.
-With Slack reporting, the first reportable completion creates a short execution
-status parent and posts the full result in its thread. Later ticks update that
-parent in place and add their results as replies. Skipped, missed and unstarted
-occurrences appear in Workflow status.
+With a hosted control plane supporting cron live progress, the first successful
+runtime claim creates a `Run starting` status parent. Each executing tick can
+update one temporary progress reply in that thread, using the same Codex/Claude
+summary, commentary and activity display as normal Slack mentions. The full tick
+result is a separate reply; confirmed final publication removes only its temporary
+progress. Later ticks update the persistent parent in place. Unclaimed, skipped
+and missed occurrences appear in Workflow status without Slack output. A claimed
+preparation failure receives a terminal explanation.
+
+This behavior requires the hosted live-progress release and its database migration;
+no new chart setting, native image rebuild or chart release is needed solely to
+enable it. Earlier hosted releases create the parent after the first completion.
 
 Set `continuity: fresh` for an independent sandbox on each occurrence. Each
 reportable occurrence uses the same status-parent/result-thread presentation.
