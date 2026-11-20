@@ -46,6 +46,47 @@ The namespace must have no retained PVCs when fresh initialization is requested.
 
 See [UPGRADE.md](UPGRADE.md) for rotation, CRDs and preservation rules.
 
+## Slack workspace default and channel overrides
+
+This configuration requires the hosted and execution controllers implementing
+workspace default/override routing. Upgrading CRD descriptions or applying these
+examples with older controller binaries alone does not enable the routing change.
+Deploy both updated controllers before combining a default and channel overrides.
+The feature uses the existing protocol and CRD fields; it does not require new
+Slack scopes, a native/customer image rebuild or a receipt/session reset.
+
+Use [slack-workspace-default.yaml](examples/slack-workspace-default.yaml) to route
+otherwise-unmatched authorized channels to a local Agent. Add optional
+[slack-channel-override.yaml](examples/slack-channel-override.yaml) Workflows for
+specific channels. Each referenced Agent must exist in that installation's
+namespace; keep image, harness, skills and AccessProfile configuration on the Agent.
+
+The default and overrides may live in different execution installations under
+the same Cody organization. For example, apply the default to UAE non-prod and
+an exact channel override to North EU non-prod. Both sources must resolve the
+same Slack workspace; omit `connectorRef` for the organization's default Slack
+connection, or set the named connection explicitly. Agent names may be identical
+across installations because each installation resolves its own local Agent.
+
+For a new conversation the hosted control plane chooses the exact channel's
+installation before the workspace default. Inside that installation, exact local
+routes likewise precede its default. Declare only one default per workspace and
+one exact override per channel; duplicate declarations at the winning specificity
+are conflicts. A missing or unavailable winning Agent does not execute the default.
+
+An existing thread keeps its installation owner. Each new command selects its
+Agent from that installation's current routes, so a local route edit may change
+the Agent and sandbox; native history is not transferred. A channel override in
+another installation affects new conversations. Already admitted commands keep
+their frozen configuration. Queueing and cron-session follow-ups retain their
+existing behavior.
+
+`channels: ["*"]` is a routing default, not a channel permission grant or DM
+configuration. Under explicit source policy, only individually granted channels
+or an existing workspace grant may execute. Source authorization and Slack app
+access still apply to each mention. Helm does not create these customer Workflows
+or grant sources automatically.
+
 ## Agent assets and controller access
 
 Authentication is selected on each Agent skill/reference entry. Omit `auth` for
