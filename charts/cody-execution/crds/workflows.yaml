@@ -459,6 +459,12 @@ spec:
                       maxLength: 256
                     channels:
                       type: array
+                      description: >-
+                        Ordinary Slack channels. A sole '*' declares this workspace's default;
+                        exact channel routes take precedence. Requires hosted and execution
+                        controllers supporting default/override routing. Source policy still
+                        authorizes each concrete channel. Existing threads retain installation
+                        ownership; Agent selection uses current local routes per new command.
                       x-kubernetes-list-type: set
                       minItems: 1
                       maxItems: 256
@@ -483,6 +489,10 @@ spec:
                     type: object
                     required: [reason]
                     properties:
+                      slackSelectorHash:
+                        type: string
+                        description: Fingerprint of the observed Slack connector reference and channel selector; declaration identity only, not execution authority
+                        pattern: '^[0-9a-f]{64}$'
                       reason:
                         type: string
                         enum: [Accepted, Pending, ConnectorUnbound, PolicyDenied, Conflict, Invalid]

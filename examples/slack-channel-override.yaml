@@ -1,0 +1,11 @@
+# Apply in the same installation or another installation in the organization.
+# Replace the channel ID and choose an Agent local to that installation.
+apiVersion: execution.cody.so/v1alpha1
+kind: Workflow
+metadata:
+  name: slack-channel-override
+spec:
+  agent: cody-debug
+  source:
+    provider: slack
+    channels: [C12345678]

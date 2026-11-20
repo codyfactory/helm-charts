@@ -1,0 +1,12 @@
+# Apply in the installation that should handle otherwise-unmatched channels.
+# The referenced Agent must exist in that installation's namespace.
+apiVersion: execution.cody.so/v1alpha1
+kind: Workflow
+metadata:
+  name: slack-workspace-default
+spec:
+  agent: cody-debug
+  source:
+    provider: slack
+    # Omitted connectorRef selects the organization's default Slack connection.
+    channels: ["*"]
