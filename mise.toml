@@ -1,9 +1,15 @@
 [tools]
+node = "24.16.0"
+ripgrep = "14.1.0"
 helm = "4.3.1"
 kubectl = "1.37.2"
 
 [tasks.verify]
-run = "helm lint --strict charts/cody-execution --values examples/lint-values.yaml && bash tests/templates.sh"
+run = "helm lint --strict charts/cody-execution --values examples/lint-values.yaml && bash tests/templates.sh && node --test tests/release.test.mjs"
 
 [tasks.package]
 run = "helm package charts/cody-execution --destination artifacts"
+
+[tasks."release:package"]
+description = "Package a versioned release from a temporary chart copy; arguments: version execution-digest native-digest output-dir"
+run = "node scripts/package.mjs"
