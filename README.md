@@ -437,3 +437,11 @@ execution and native runtime images. See [UPGRADE.md](UPGRADE.md#cron-hard-cutov
 ## Workflow source status
 
 Workflows report source authorization and conflicts through `status.sources`, `SourcesReady`, and the `SourcesReady`/`SourceReason` printer columns. See [the coordinated source-authorization upgrade](UPGRADE.md#organization-source-authorization) before using these fields or optional connector references.
+
+## Release automation
+
+PRs and main are verified on the existing `codyfactory-private` runner group with pinned mise tools, template/schema checks, packaging tests and published-history checks. Existing root `.tgz` bytes and index digests cannot be replaced or removed.
+
+Core's release workflow is the publisher. It invokes `mise run release:package -- VERSION EXECUTION_DIGEST NATIVE_DIGEST OUTPUT_DIR` from a fixed chart source revision. Packaging uses a temporary copy and leaves editable chart defaults alone; publication appends the archive/index/tag to main. Enable `RELEASE_NOTIFICATIONS_ENABLED=true` only after core CI/dev setup, and configure `CODY_RELEASE_APP_ID`/`CODY_RELEASE_APP_PRIVATE_KEY` (Actions write on core). Successful authored chart/test/build source changes request a dev release; archive/index-only publication does not recurse. Permit that App to append verified release commits/tags to main without enabling direct human chart-source changes.
+
+Use explicit `--version 0.7.0-dev.RUN.ATTEMPT` for dev charts, or intentionally `helm search repo cody/cody-execution --devel --versions` for discovery. Normal Helm resolution excludes prereleases; stable customers keep explicit versions and control their upgrades. See [release operation](https://github.com/codyfactory/cody/blob/main/deploy/fly/RELEASES.md) for environment setup and production promotion.

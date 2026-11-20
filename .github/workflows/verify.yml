@@ -1,0 +1,55 @@
+name: Verify
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  verify:
+    runs-on: codyfactory-private
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@v2
+      - run: mise run verify
+      - name: Verify published archive history
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/history.mjs "$BASE"
+  notify:
+    needs: verify
+    if: github.event_name == 'push' && vars.RELEASE_NOTIFICATIONS_ENABLED == 'true'
+    runs-on: codyfactory-private
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify source changes
+        id: source
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git diff --name-only "$BEFORE" HEAD -- charts examples tests scripts mise.toml .github | grep -q .; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/create-github-app-token@v2
+        if: steps.source.outputs.changed == 'true'
+        id: release
+        with:
+          app-id: ${{ vars.CODY_RELEASE_APP_ID }}
+          private-key: ${{ secrets.CODY_RELEASE_APP_PRIVATE_KEY }}
+          owner: codyfactory
+          repositories: cody
+          permission-actions: write
+      - name: Request a development release
+        if: steps.source.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.release.outputs.token }}
+        run: gh workflow run release.yml --repo codyfactory/cody --ref main -f mode=dev
