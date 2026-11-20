@@ -489,6 +489,10 @@ spec:
                     type: object
                     required: [reason]
                     properties:
+                      slackSelectorHash:
+                        type: string
+                        description: Fingerprint of the observed Slack connector reference and channel selector; declaration identity only, not execution authority
+                        pattern: '^[0-9a-f]{64}$'
                       reason:
                         type: string
                         enum: [Accepted, Pending, ConnectorUnbound, PolicyDenied, Conflict, Invalid]

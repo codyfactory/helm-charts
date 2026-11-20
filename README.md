@@ -52,8 +52,10 @@ This configuration requires the hosted and execution controllers implementing
 workspace default/override routing. Upgrading CRD descriptions or applying these
 examples with older controller binaries alone does not enable the routing change.
 Deploy both updated controllers before combining a default and channel overrides.
-The feature uses the existing protocol and CRD fields; it does not require new
-Slack scopes, a native/customer image rebuild or a receipt/session reset.
+The feature uses existing configuration and protocol fields. Apply the updated
+Workflow CRD before the controllers: its status adds `slackSelectorHash` to retain
+declaration provenance across restarts and Agent-only edits. No new Slack scopes,
+native/customer image rebuild or receipt/session reset is required.
 
 Use [slack-workspace-default.yaml](examples/slack-workspace-default.yaml) to route
 otherwise-unmatched authorized channels to a local Agent. Add optional
