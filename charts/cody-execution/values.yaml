@@ -1,4 +1,4 @@
-image: "ghcr.io/codyfactory/cody-execution@sha256:192b1c4093c1e3566bf0c363277eac93d22e1a6e85864523f806d1107206f260"
+image: "ghcr.io/codyfactory/cody-execution@sha256:2ff8247c78c587501fa19ae411c68730bb95beeb134dda47e7207efff7077dd3"
 installation: ""
 gatewayURL: ""
 installationToken: ""
@@ -36,7 +36,7 @@ networkPolicy:
 scheduling: {}
 onboarding:
   enabled: false
-  image: "ghcr.io/codyfactory/cody-runtime-general@sha256:58f02b032123a254922134750981e738e9d5793cfb2b49131d1c253a1a58bbca"
+  image: "ghcr.io/codyfactory/cody-runtime-general@sha256:ef238af54165508bfde1231cfc55ef3d0788b4633d0f001d4a8519bfc9b79025"
   model: cody/codex-v1
 assetAccess:
   azure:
