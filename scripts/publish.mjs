@@ -36,13 +36,14 @@ export function publish(verified) {
     console.log('Verified source is already published');
     return;
   }
-  const parent = git(['rev-parse', `${verified}^`]);
-  if (!git(['diff', '--name-only', parent, verified, '--', ...sourcePaths])) {
-    console.log('No chart source changes');
-    return;
-  }
   if (git(['diff', '--name-only', verified, 'origin/main', '--', ...sourcePaths])) {
     console.log('Newer chart source is awaiting its own verification');
+    return;
+  }
+  const published = git(['log', '-1', '--format=%H', 'origin/main', '--', 'index.yaml']);
+  assert.match(published, /^[a-f0-9]{40}$/, 'Published chart index history is required');
+  if (!git(['diff', '--name-only', published, verified, '--', ...sourcePaths])) {
+    console.log('No chart source changes');
     return;
   }
   git(['checkout', '--detach', 'origin/main']);

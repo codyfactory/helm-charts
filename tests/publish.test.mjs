@@ -7,8 +7,9 @@ import { tmpdir } from 'node:os';
 import { nextVersion, appendEntry } from '../scripts/publish.mjs';
 
 const root = process.cwd();
+const publishedIndex = 'apiVersion: v1\nentries:\n  cody-execution:\n  - name: cody-execution\n    version: 0.6.9\n    digest: fixture\ngenerated: fixture\n';
 test('Chart versions advance independently and retain old index entries', () => {
-  const index = readFileSync('index.yaml', 'utf8');
+  const index = publishedIndex;
   assert.equal(nextVersion(index, '0.6.9'), '0.6.10');
   assert.equal(nextVersion(index, '1.0.0'), '1.0.0');
   const generated = 'apiVersion: v1\nentries:\n  cody-execution:\n  - version: 0.6.10\n    digest: abc\ngenerated: now\n';
@@ -29,7 +30,9 @@ test('Verified source publishes once; generated commits and stale verification d
     git(['config', 'user.name', 'Fixture']); git(['config', 'user.email', 'fixture@example.test']);
     git(['checkout', '-b', 'main']);
     cpSync('charts', join(local, 'charts'), { recursive: true });
-    cpSync('index.yaml', join(local, 'index.yaml'));
+    writeFileSync(join(local, 'index.yaml'), publishedIndex);
+    const metadata = join(local, 'charts/cody-execution/Chart.yaml');
+    writeFileSync(metadata, readFileSync(metadata, 'utf8').replace(/^version:.*$/m, 'version: 0.6.9'));
     git(['add', '.']); git(['commit', '-qm', 'Initial']); git(['push', '-u', 'origin', 'main']);
     git(['checkout', '-b', 'source-change']);
     writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');
@@ -44,6 +47,11 @@ test('Verified source publishes once; generated commits and stale verification d
     assert.equal(git(['rev-parse', 'HEAD']), published);
     const archive = join(local, 'cody-execution-0.6.10.tgz');
     assert.equal(execute('helm', ['show', 'values', archive]), execute('helm', ['show', 'values', resolve(root, 'charts/cody-execution')]));
+    writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');
+    git(['add', '.']); git(['commit', '-qm', 'Source change before documentation']);
+    writeFileSync(join(local, 'README.md'), 'Documentation-only tip of a multi-commit push');
+    git(['add', '.']); git(['commit', '-qm', 'Documentation']); git(['push', 'origin', 'HEAD:main']);
+    assert.match(publish(git(['rev-parse', 'HEAD'])), /Published chart 0.6.11/);
     writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');
     git(['add', '.']); git(['commit', '-qm', 'Next source']); git(['push', 'origin', 'HEAD:main']);
     const stale = git(['rev-parse', 'HEAD']);
