@@ -4,6 +4,22 @@ This is the canonical public chart source for Cody's customer execution plane. C
 
 Chart `0.6.9` pins execution build `0.6.9-48a458a055cf`. It uses delivery protocol 4; see [UPGRADE.md](UPGRADE.md) for CRD updates and supported upgrade requirements.
 
+## Independent chart releases
+
+After source changes merge to main and Verify succeeds, Publish chart packages
+an immutable patch version above the highest stable version in `index.yaml`.
+A larger explicit version in Chart.yaml takes precedence over the automatic patch bump.
+The publication commit changes only the new archive and index entry, so it does
+not trigger another publication. Re-running the same verified source is a no-op. Chart source in `charts/` keeps its baseline
+version; the published archive receives its own version during packaging.
+Existing image defaults are preserved. No Docker build, image promotion or
+hosted deployment is triggered by chart publication.
+
+Publication uses the existing `CODY_RELEASE_APP_ID` and
+`CODY_RELEASE_APP_PRIVATE_KEY` with contents-write access to this repository.
+The old `RELEASE_NOTIFICATIONS_ENABLED` switch is no longer used. The private
+runner must be available for verification and publication.
+
 ## Install
 
 Use an existing Linux amd64/arm64 Kubernetes cluster with persistent storage, Helm 4.3.1 and kubectl 1.37.2. In [Cody](https://app.cody.so), create an organization and installation, request inference approval and authorize/download that installation's private values. Keep the downloaded file private; it contains a long-lived installation key. Helm retains inline values in its release records.

@@ -1,0 +1,38 @@
+name: Publish chart
+on:
+  workflow_run:
+    workflows: [Verify]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: chart-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: codyfactory-private
+    timeout-minutes: 10
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: writer
+        with:
+          app-id: ${{ vars.CODY_RELEASE_APP_ID }}
+          private-key: ${{ secrets.CODY_RELEASE_APP_PRIVATE_KEY }}
+          owner: codyfactory
+          repositories: helm-charts
+          permission-contents: write
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          token: ${{ steps.writer.outputs.token }}
+      - uses: jdx/mise-action@v2
+      - name: Publish the verified chart source
+        env:
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/publish.mjs "$VERIFIED_SHA"
