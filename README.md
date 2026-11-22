@@ -2,7 +2,7 @@
 
 This is the canonical public chart source for Cody's customer execution plane. Cody hosts coordination and inference; customers install execution in their own Kubernetes cluster. No Cody laptop CLI, Apple account, package repository or GitHub Actions is needed.
 
-Chart `0.6.10` pins execution build `pilot-20261120-31d42977`, including released-attempt and scheduler recovery. It uses delivery protocol 4; see [UPGRADE.md](UPGRADE.md) for CRD updates and supported upgrade requirements.
+Chart `0.6.9` pins execution build `0.6.9-48a458a055cf`. It uses delivery protocol 4; see [UPGRADE.md](UPGRADE.md) for CRD updates and supported upgrade requirements.
 
 ## Install
 
