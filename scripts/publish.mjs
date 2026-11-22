@@ -41,8 +41,7 @@ export function publish(verified) {
     console.log('No chart source changes');
     return;
   }
-  const latestSource = git(['log', '-1', '--format=%H', 'origin/main', '--', ...sourcePaths]);
-  if (latestSource !== verified) {
+  if (git(['diff', '--name-only', verified, 'origin/main', '--', ...sourcePaths])) {
     console.log('Newer chart source is awaiting its own verification');
     return;
   }

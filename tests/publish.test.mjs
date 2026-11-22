@@ -31,8 +31,10 @@ test('Verified source publishes once; generated commits and stale verification d
     cpSync('charts', join(local, 'charts'), { recursive: true });
     cpSync('index.yaml', join(local, 'index.yaml'));
     git(['add', '.']); git(['commit', '-qm', 'Initial']); git(['push', '-u', 'origin', 'main']);
+    git(['checkout', '-b', 'source-change']);
     writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');
-    git(['add', '.']); git(['commit', '-qm', 'Chart source']); git(['push']);
+    git(['add', '.']); git(['commit', '-qm', 'Chart source']);
+    git(['checkout', 'main']); git(['merge', '--no-ff', '-m', 'Merge chart source', 'source-change']); git(['push']);
     const verified = git(['rev-parse', 'HEAD']);
     assert.match(publish(verified), /Published chart 0.6.10/);
     const published = git(['rev-parse', 'HEAD']);
