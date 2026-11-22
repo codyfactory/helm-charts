@@ -1,4 +1,4 @@
-image: "ghcr.io/codyfactory/cody-execution@sha256:2ff8247c78c587501fa19ae411c68730bb95beeb134dda47e7207efff7077dd3"
+image: "ghcr.io/codyfactory/cody-execution@sha256:17cd27f2471059335e45ccd9369f053933246cf31cfd5bb53f309cef82e60402"
 installation: ""
 gatewayURL: ""
 installationToken: ""

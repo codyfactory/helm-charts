@@ -1,5 +1,5 @@
 apiVersion: v2
 name: cody-execution
-version: 0.6.9
-appVersion: 0.6.9-48a458a055cf
+version: 0.6.10
+appVersion: pilot-20261120-31d42977
 description: Cody execution plane and persistent Sandboxes
