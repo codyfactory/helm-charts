@@ -35,4 +35,18 @@ jobs:
       - name: Publish the verified chart source
         env:
           VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: node scripts/publish.mjs "$VERIFIED_SHA"
+        run: |
+          mkdir -p artifacts
+          node scripts/publish.mjs "$VERIFIED_SHA" artifacts/chart-publication.json
+      - name: Verify public bytes and publish durable metadata
+        if: hashFiles('artifacts/chart-publication.json') != ''
+        env:
+          GH_TOKEN: ${{ steps.writer.outputs.token }}
+          VERIFY_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: node scripts/publication.mjs artifacts/chart-publication.json
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('artifacts/publication.json') != ''
+        with:
+          name: component-publication
+          overwrite: true
+          path: artifacts/publication.json

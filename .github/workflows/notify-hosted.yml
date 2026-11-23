@@ -1,0 +1,39 @@
+name: Notify hosted delivery
+on:
+  workflow_run:
+    workflows: [Publish chart]
+    types: [completed]
+    branches: [main]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  notify:
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: codyfactory-private
+    steps:
+      - name: Check whether this run published a component
+        id: publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          count=$(gh api "repos/codyfactory/helm-charts/actions/runs/$RUN_ID/artifacts" --jq '[.artifacts[] | select(.name == "component-publication")] | length')
+          test "$count" -le 1
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v2
+        if: steps.publication.outputs.count == '1'
+        id: release
+        with:
+          app-id: ${{ vars.CODY_RELEASE_APP_ID }}
+          private-key: ${{ secrets.CODY_RELEASE_APP_PRIVATE_KEY }}
+          owner: codyfactory
+          repositories: cody
+          permission-actions: write
+      - name: Request hosted dev delivery
+        if: steps.publication.outputs.count == '1'
+        env:
+          GH_TOKEN: ${{ steps.release.outputs.token }}
+        run: gh workflow run hosted-release.yml --repo codyfactory/cody --ref main -f mode=dev
