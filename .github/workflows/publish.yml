@@ -26,6 +26,7 @@ jobs:
           owner: codyfactory
           repositories: helm-charts
           permission-contents: write
+          permission-actions: read
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}

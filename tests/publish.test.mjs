@@ -52,6 +52,14 @@ test('Verified source publishes once; generated commits and stale verification d
     writeFileSync(join(local, 'README.md'), 'Documentation-only tip of a multi-commit push');
     git(['add', '.']); git(['commit', '-qm', 'Documentation']); git(['push', 'origin', 'HEAD:main']);
     assert.match(publish(git(['rev-parse', 'HEAD'])), /Published chart 0.6.11/);
+    const indexBeforeRepair=readFileSync(join(local,'index.yaml'));
+    const archiveBeforeRepair=readFileSync(archive);
+    const plan=join(directory,'repair.json');
+    assert.match(execute(process.execPath,[resolve(root,'scripts/publish.mjs'),verified,plan],local),/already published/);
+    const repaired=JSON.parse(readFileSync(plan,'utf8'));
+    assert.equal(repaired.version,'0.6.10');assert.equal(repaired.sourceCommit,verified);assert.equal(repaired.publicationCommit,published);
+    assert.deepEqual(readFileSync(archive),archiveBeforeRepair);
+    assert.deepEqual(readFileSync(join(local,'index.yaml')),indexBeforeRepair);
     writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');
     git(['add', '.']); git(['commit', '-qm', 'Next source']); git(['push', 'origin', 'HEAD:main']);
     const stale = git(['rev-parse', 'HEAD']);
