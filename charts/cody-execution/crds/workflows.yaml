@@ -305,6 +305,11 @@ spec:
                       type: object
                       required: [checkName]
                       properties:
+                        maxAutomaticReviewHeads:
+                          description: Maximum distinct assessed heads per review window; omitted or zero disables the limit.
+                          type: integer
+                          format: int64
+                          minimum: 0
                         checkName:
                           type: string
                           minLength: 1
