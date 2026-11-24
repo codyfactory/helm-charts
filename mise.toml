@@ -1,11 +1,12 @@
 [tools]
+actionlint = "1.7.12"
 node = "24.16.0"
 ripgrep = "14.1.0"
 helm = "4.3.1"
 kubectl = "1.37.2"
 
 [tasks.verify]
-run = "helm lint --strict charts/cody-execution --values examples/lint-values.yaml && bash tests/templates.sh && node --test tests/*.test.mjs"
+run = "helm lint --strict charts/cody-execution --values examples/lint-values.yaml && bash tests/templates.sh && node --test tests/*.test.mjs && actionlint"
 
 [tasks.package]
 run = "helm package charts/cody-execution --destination artifacts"

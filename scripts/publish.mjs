@@ -32,9 +32,13 @@ export function appendEntry(index, generated) {
 export function publish(verified) {
   assert.match(verified, /^[a-f0-9]{40}$/);
   git(['fetch', 'origin', 'main']);
-  if (git(['log', '-1', '--format=%H', `--grep=^Chart-Source: ${verified}$`, 'origin/main'])) {
+  const existing = git(['log', '-1', '--format=%H', `--grep=^Chart-Source: ${verified}$`, 'origin/main']);
+  if (existing) {
     console.log('Verified source is already published');
-    return;
+    const archives = git(['diff-tree', '--no-commit-id', '--name-only', '-r', existing]).split('\n').filter(name => /^cody-execution-\d+\.\d+\.\d+\.tgz$/.test(name));
+    assert.equal(archives.length, 1, 'Published source must identify exactly one archive');
+    git(['checkout', '--detach', 'origin/main']);
+    return { sourceCommit: verified, publicationCommit: existing, version: archives[0].slice('cody-execution-'.length, -4), archive: archives[0] };
   }
   if (git(['diff', '--name-only', verified, 'origin/main', '--', ...sourcePaths])) {
     console.log('Newer chart source is awaiting its own verification');
@@ -63,7 +67,11 @@ export function publish(verified) {
     git(['tag', `cody-execution-${version}`]);
     git(['push', '--atomic', 'origin', 'HEAD:main', `refs/tags/cody-execution-${version}`]);
     console.log(`Published chart ${version} from ${verified}`);
+    return { sourceCommit: verified, publicationCommit: git(['rev-parse', 'HEAD']), version, archive: name };
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) publish(process.argv[2]);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const result = publish(process.argv[2]);
+  if (result && process.argv[3]) writeFileSync(process.argv[3], JSON.stringify(result) + '\n');
+}

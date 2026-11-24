@@ -10,10 +10,9 @@ After source changes merge to main and Verify succeeds, Publish chart packages
 an immutable patch version above the highest stable version in `index.yaml`.
 A larger explicit version in Chart.yaml takes precedence over the automatic patch bump.
 The publication commit changes only the new archive and index entry, so it does
-not trigger another publication. Re-running the same verified source is a no-op. Chart source in `charts/` keeps its baseline
+not trigger another publication. Re-running the same verified source never repackages it; publication metadata can be completed on retry. Chart source in `charts/` keeps its baseline
 version; the published archive receives its own version during packaging.
-Existing image defaults are preserved. No Docker build, image promotion or
-hosted deployment is triggered by chart publication.
+Existing image defaults are preserved. The publisher builds no images; its completed publication notifies core hosted delivery, which tests the selected artifacts and deploys dev when enabled.
 
 Publication uses the existing `CODY_RELEASE_APP_ID` and
 `CODY_RELEASE_APP_PRIVATE_KEY` with contents-write access to this repository.
@@ -499,8 +498,32 @@ Workflows report source authorization and conflicts through `status.sources`, `S
 
 ## Release automation
 
-PRs and main are verified on the existing `codyfactory-private` runner group with pinned mise tools, template/schema checks, packaging tests and published-history checks. Existing root `.tgz` bytes and index digests cannot be replaced or removed.
+PRs and main use `codyfactory-private`, pinned mise tools/actionlint, lint/template/schema/package tests and published-history checks. Existing archive bytes and index digests cannot be replaced or removed.
 
-Core's release workflow is the publisher. It invokes `mise run release:package -- VERSION EXECUTION_DIGEST NATIVE_DIGEST OUTPUT_DIR` from a fixed chart source revision. Packaging uses a temporary copy and leaves editable chart defaults alone; publication appends the archive/index/tag to main. Enable `RELEASE_NOTIFICATIONS_ENABLED=true` only after core CI/dev setup, and configure `CODY_RELEASE_APP_ID`/`CODY_RELEASE_APP_PRIVATE_KEY` (Actions write on core). Successful authored chart/test/build source changes request a dev release; archive/index-only publication does not recurse. Permit that App to append verified release commits/tags to main without enabling direct human chart-source changes.
+## Hosted release handoff
 
-Use explicit `--version 0.7.0-dev.RUN.ATTEMPT` for dev charts, or intentionally `helm search repo cody/cody-execution --devel --versions` for discovery. Normal Helm resolution excludes prereleases; stable customers keep explicit versions and control their upgrades. See [release operation](https://github.com/codyfactory/cody/blob/main/deploy/fly/RELEASES.md) for environment setup and production promotion.
+After publishing a verified chart, CI downloads its public archive, checks size and
+SHA-256, and writes `publication.json` on the existing `cody-execution-VERSION`
+GitHub release/tag. It records authored source, publication commit and verification
+runs. Retrying metadata publication preserves the package bytes and source identity.
+An already successful receipt keeps its original Verify/publisher attempt, so a
+cancelled rerun cannot invalidate it. Incomplete or failed provenance can be repaired
+for the same bytes. Metadata lookup targets one tag and includes draft releases.
+Archive/index-only commits do not publish or notify again.
+
+A successful publication notifies core's `hosted-release.yml`. Core selects published
+core/UI/chart artifacts, runs paired acceptance and automatically deploys hosted dev
+once configured. Explicit production promotion uses that same chart archive; it
+never republishes or renumbers the chart to match a hosted version. Portal values
+select accepted image digests. The Helm version shown by the portal remains the
+actual chart version, even when the hosted release ID is a prerelease.
+
+Merge the core hosted workflow before these notifications. The release App needs
+Contents write and Actions read on this repo, and Actions write on core, requested in separate scoped
+tokens. Use the existing private runner; no Fly/AKS or live database credentials are
+needed here. The obsolete `RELEASE_NOTIFICATIONS_ENABLED` switch is not used.
+
+See [hosted operations](https://github.com/codyfactory/cody/blob/main/deploy/fly/RELEASES.md)
+for one-time dev/prod setup. Customers still upgrade explicitly and retain their
+private values, Secrets and PVCs; image aliases or chart publication do not update
+an existing installation.
