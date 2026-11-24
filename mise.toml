@@ -6,7 +6,7 @@ helm = "4.3.1"
 kubectl = "1.37.2"
 
 [tasks.verify]
-run = "helm lint --strict charts/cody-execution --values examples/lint-values.yaml && bash tests/templates.sh && node --test tests/*.test.mjs && actionlint"
+run = "helm lint --strict charts/cody-execution --values examples/lint-values.yaml && bash tests/templates.sh && node --test tests/*.test.mjs && helm lint --strict charts/cody-control-plane -f examples/control-plane-values.yaml && actionlint"
 
 [tasks.package]
 run = "helm package charts/cody-execution --destination artifacts"

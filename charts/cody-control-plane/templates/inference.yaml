@@ -1,0 +1,87 @@
+{{- if .Values.inference.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-inference
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-inference
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-inference
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: inference
+          image: {{ .Values.image | quote }}
+          command: [/cody-control-plane]
+          args:
+            {{- if $.Values.development }}
+            - --development
+            {{- end }}
+            - --role=inference
+            - --api-origin={{ required "apiOrigin is required" .Values.apiOrigin }}
+            - --tls-cert=/tls/tls.crt
+            - --tls-key=/tls/tls.key
+            - --inference-policy-file=/policy/policy.json
+          env:
+            - name: CODY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseSecret is required" .Values.databaseSecret }}
+                  key: url
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: health
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            - name: policy
+              mountPath: /policy
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ required "inference.tlsSecret is required" .Values.inference.tlsSecret }}
+        - name: policy
+          secret:
+            secretName: {{ required "inference.policySecret is required" .Values.inference.policySecret }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-inference
+spec:
+  selector:
+    app: {{ .Release.Name }}-inference
+  ports:
+    - port: 8443
+      targetPort: 8443
+{{- end }}

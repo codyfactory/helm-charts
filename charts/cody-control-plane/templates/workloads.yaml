@@ -1,0 +1,289 @@
+{{- if or .Values.tenant .Values.installations .Values.installationTokensSecret }}{{ fail "static tenant/installation roster values were removed; import into the SaaS registry" }}{{ end -}}
+{{- $database := required "databaseSecret is required" .Values.databaseSecret -}}
+{{- $tls := required "serverTLSSecret is required" .Values.serverTLSSecret -}}
+{{- $operator := required "operatorTokenSecret is required" .Values.operatorTokenSecret -}}
+{{- $signing := .Values.inferenceSigningKeySecret.name -}}
+{{- if and .Values.stripe.secret (not .Values.consoleEnabled) -}}
+{{- fail "stripe.secret requires consoleEnabled" -}}
+{{- end -}}
+{{- if $signing -}}
+{{- $_ := required "inferenceSigningKeySecret.key is required" .Values.inferenceSigningKeySecret.key -}}
+{{- $_ := required "inferenceSigningKeyID is required" .Values.inferenceSigningKeyID -}}
+{{- $_ := required "inferenceAudience is required" .Values.inferenceAudience -}}
+{{- else if or .Values.inferenceSigningKeySecret.key .Values.inferenceSigningKeyID .Values.inferenceAudience -}}
+{{- fail "supply all inference signing settings together" -}}
+{{- end -}}
+{{- range $role := list "api" "gateway" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  replicas: {{ if eq $role "api" }}{{ $.Values.apiReplicas }}{{ else }}1{{ end }}
+  {{- if eq $role "gateway" }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-{{ $role }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-{{ $role }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: {{ $role }}
+          image: {{ $.Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/cody-control-plane]
+          args:
+            {{- if $.Values.development }}
+            - --development
+            {{- end }}
+            - --role
+            - {{ $role }}
+            - --execution-releases-file=/execution-releases/releases.json
+            - --release-channel={{ $.Values.releaseChannel | default "prod" }}
+            - --api-origin={{ required "apiOrigin is required" $.Values.apiOrigin }}
+            {{- if $.Values.inference.enabled }}
+            - --inference-policy-file=/policy/policy.json
+            {{- end }}
+            - --lease-ttl
+            - {{ required "leaseTTL is required" $.Values.leaseTTL | quote }}
+            - --lease-renewal-interval
+            - {{ required "leaseRenewalInterval is required" $.Values.leaseRenewalInterval | quote }}
+            - --provisioning-timeout
+            - {{ required "provisioningTimeout is required" $.Values.provisioningTimeout | quote }}
+            - --lease-skew
+            - {{ required "leaseSkew is required" $.Values.leaseSkew | quote }}
+            - --tls-cert
+            - /tls/tls.crt
+            - --tls-key
+            - /tls/tls.key
+            {{- if eq $role "gateway" }}
+            {{- if $.Values.github.enabled }}
+            - --checkout-issuer-url=https://{{ $.Release.Name }}-connectors:8443
+            - --checkout-issuer-token-file=/checkout-issuer/token
+            {{- if $.Values.github.checkoutIssuerCASecret }}
+            - --checkout-issuer-ca-file=/checkout-issuer-ca/ca.crt
+            {{- end }}
+            {{- end }}
+            {{- if $signing }}
+            - --inference-signing-key-file
+            - /inference-signing/key
+            - --inference-signing-key-id
+            - {{ $.Values.inferenceSigningKeyID | quote }}
+            - --inference-audience
+            - {{ $.Values.inferenceAudience | quote }}
+            {{- end }}
+            {{- else }}
+            - --operator-token-file
+            - /operator/token
+            {{- if $.Values.slack.enabled }}
+            - --slack-app-id={{ required "slack.appID is required" $.Values.slack.appID }}
+            - --slack-client-id={{ required "slack.clientID is required" $.Values.slack.clientID }}
+            - --slack-redirect-url={{ required "slack.redirectURL is required" $.Values.slack.redirectURL }}
+            - --slack-signing-secret-file=/slack/signing-secret
+            - --slack-client-secret-file=/slack/client-secret
+            - --slack-encryption-key-file=/slack/encryption-key
+            {{- end }}
+            {{- if $.Values.github.enabled }}
+            - --github-app-id={{ required "github.appID is required" $.Values.github.appID }}
+            - --github-private-key-file=/github/private-key
+            - --github-client-id={{ required "github.clientID is required" $.Values.github.clientID }}
+            - --github-redirect-url={{ required "github.redirectURL is required" $.Values.github.redirectURL }}
+            - --github-client-secret-file=/github/client-secret
+            - --github-state-key-file=/github/state-key
+            {{- end }}
+            {{- if $.Values.consoleEnabled }}
+            - --console-enabled
+            - --trusted-proxy-cidrs={{ required "trustedProxyCIDRs is required" $.Values.trustedProxyCIDRs }}
+            - --client-ip-header={{ required "clientIPHeader is required" $.Values.clientIPHeader }}
+            - --app-origin={{ required "appOrigin is required" $.Values.appOrigin }}
+            - --web-upstream={{ required "webUpstream is required" $.Values.webUpstream }}
+            - --auth-bridge-secret-file=/auth-bridge/secret
+            {{- if $.Values.stripe.secret }}
+            - --stripe-secret-key-file=/stripe/secret-key
+            - --stripe-webhook-secret-file=/stripe/webhook-secret
+            {{- end }}
+
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: health
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            periodSeconds: 2
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            periodSeconds: 10
+          env:
+            - name: CODY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $database }}
+                  key: url
+          volumeMounts:
+            - name: execution-releases
+              mountPath: /execution-releases
+              readOnly: true
+            {{- if $.Values.inference.enabled }}
+            - name: policy
+              mountPath: /policy
+              readOnly: true
+            {{- end }}
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            {{- if eq $role "api" }}
+            - name: operator
+              mountPath: /operator
+              readOnly: true
+            {{- if $.Values.slack.enabled }}
+            - name: slack
+              mountPath: /slack
+              readOnly: true
+            {{- end }}
+            {{- if $.Values.github.enabled }}
+            - name: github
+              mountPath: /github
+              readOnly: true
+            {{- end }}
+            {{- if $.Values.consoleEnabled }}
+            - name: auth-bridge
+              mountPath: /auth-bridge
+              readOnly: true
+            {{- if $.Values.stripe.secret }}
+            - name: stripe
+              mountPath: /stripe
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- else }}
+            {{- if $.Values.github.enabled }}
+            - name: checkout-issuer
+              mountPath: /checkout-issuer
+              readOnly: true
+            {{- if $.Values.github.checkoutIssuerCASecret }}
+            - name: checkout-issuer-ca
+              mountPath: /checkout-issuer-ca
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if $signing }}
+            - name: inference-signing
+              mountPath: /inference-signing
+              readOnly: true
+            {{- end }}
+            {{- end }}
+      volumes:
+        - name: execution-releases
+          configMap:
+            name: {{ required "executionReleasesConfigMap is required" $.Values.executionReleasesConfigMap }}
+        {{- if $.Values.inference.enabled }}
+        - name: policy
+          secret:
+            secretName: {{ required "inference.policySecret is required" $.Values.inference.policySecret }}
+        {{- end }}
+        - name: tls
+          secret:
+            secretName: {{ $tls }}
+        {{- if eq $role "api" }}
+        - name: operator
+          secret:
+            secretName: {{ $operator }}
+        {{- if $.Values.slack.enabled }}
+        - name: slack
+          secret:
+            secretName: {{ required "slack.secret is required" $.Values.slack.secret }}
+        {{- end }}
+        {{- if $.Values.github.enabled }}
+        - name: github
+          secret:
+            secretName: {{ required "github.secret is required" $.Values.github.secret }}
+            items:
+              - key: private-key
+                path: private-key
+              - key: client-secret
+                path: client-secret
+              - key: state-key
+                path: state-key
+        {{- end }}
+        {{- if $.Values.consoleEnabled }}
+        - name: auth-bridge
+          secret:
+            secretName: {{ required "authBridgeSecret is required" $.Values.authBridgeSecret }}
+        {{- if $.Values.stripe.secret }}
+        - name: stripe
+          secret:
+            secretName: {{ $.Values.stripe.secret }}
+            defaultMode: 0400
+            items:
+              - key: secretKey
+                path: secret-key
+              - key: webhookSecret
+                path: webhook-secret
+        {{- end }}
+        {{- end }}
+        {{- else }}
+        {{- if $.Values.github.enabled }}
+        - name: checkout-issuer
+          secret:
+            secretName: {{ required "github.checkoutIssuerTokenSecret is required" $.Values.github.checkoutIssuerTokenSecret }}
+            items:
+              - key: token
+                path: token
+        {{- if $.Values.github.checkoutIssuerCASecret }}
+        - name: checkout-issuer-ca
+          secret:
+            secretName: {{ $.Values.github.checkoutIssuerCASecret }}
+            items:
+              - key: ca.crt
+                path: ca.crt
+        {{- end }}
+        {{- end }}
+        {{- if $signing }}
+        - name: inference-signing
+          secret:
+            secretName: {{ $signing }}
+            defaultMode: 0400
+            items:
+              - key: {{ $.Values.inferenceSigningKeySecret.key | quote }}
+                path: key
+        {{- end }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  selector:
+    app: {{ $.Release.Name }}-{{ $role }}
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+    {{- if and (eq $role "api") $.Values.consoleEnabled }}
+    - name: auth
+      port: 8081
+      targetPort: health
+    {{- end }}
+{{- end }}

@@ -1,0 +1,155 @@
+{{- if hasKey .Values.slack "connectorRefs" }}
+{{- fail "Slack connection references are owned by the organization; remove slack.connectorRefs" }}
+{{- end }}
+{{- if hasKey .Values.slack "replicas" }}
+{{- fail "slack.replicas was renamed to connectors.replicas" }}
+{{- end }}
+{{- $replicas := int (required "connectors.replicas is required" .Values.connectors.replicas) }}
+{{- $reportQueueWorkers := int (required "connectors.reportQueueWorkers is required" .Values.connectors.reportQueueWorkers) }}
+{{- if lt $reportQueueWorkers 1 }}
+{{- fail "connectors.reportQueueWorkers must be at least 1" }}
+{{- end }}
+{{- if or .Values.slack.enabled .Values.github.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-connectors
+spec:
+  replicas: {{ $replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-connectors
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-connectors
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-connectors
+      containers:
+        - name: connectors
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/cody-control-plane]
+          args:
+            {{- if $.Values.development }}
+            - --development
+            {{- end }}
+            - --role=connectors
+            - --report-queue-workers={{ $reportQueueWorkers }}
+            - --api-origin={{ required "apiOrigin is required" .Values.apiOrigin }}
+            - --tls-cert=/tls/tls.crt
+            - --tls-key=/tls/tls.key
+            - --operator-token-file=/operator/token
+            {{- if .Values.slack.enabled }}
+            - --slack-app-id={{ required "slack.appID is required" .Values.slack.appID }}
+            - --slack-client-id={{ required "slack.clientID is required" .Values.slack.clientID }}
+            - --slack-redirect-url={{ required "slack.redirectURL is required" .Values.slack.redirectURL }}
+            - --slack-signing-secret-file=/slack/signing-secret
+            - --slack-client-secret-file=/slack/client-secret
+            - --slack-encryption-key-file=/slack/encryption-key
+            {{- end }}
+            {{- if .Values.github.enabled }}
+            - --checkout-issuer-token-file=/checkout-issuer/token
+            - --github-app-id={{ required "github.appID is required" .Values.github.appID }}
+            - --github-private-key-file=/github/private-key
+            - --github-webhook-secret-file=/github/webhook-secret
+            {{- end }}
+          env:
+            - name: CODY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.databaseSecret }}
+                  key: url
+          ports:
+            - name: health
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            - name: operator
+              mountPath: /operator
+              readOnly: true
+            {{- if .Values.slack.enabled }}
+            - name: slack
+              mountPath: /slack
+              readOnly: true
+            {{- end }}
+            {{- if .Values.github.enabled }}
+            - name: checkout-issuer
+              mountPath: /checkout-issuer
+              readOnly: true
+            - name: github
+              mountPath: /github
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.serverTLSSecret }}
+        - name: operator
+          secret:
+            secretName: {{ .Values.operatorTokenSecret }}
+        {{- if .Values.slack.enabled }}
+        - name: slack
+          secret:
+            secretName: {{ required "slack.secret is required" .Values.slack.secret }}
+        {{- end }}
+        {{- if .Values.github.enabled }}
+        - name: checkout-issuer
+          secret:
+            secretName: {{ required "github.checkoutIssuerTokenSecret is required" .Values.github.checkoutIssuerTokenSecret }}
+            items:
+              - key: token
+                path: token
+        - name: github
+          secret:
+            secretName: {{ required "github.secret is required" .Values.github.secret }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-connectors
+spec:
+  selector:
+    app: {{ .Release.Name }}-connectors
+  ports:
+    - port: 8443
+      targetPort: 8443
+{{- if gt $replicas 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-connectors
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-connectors
+{{- end }}
+{{- end }}

@@ -45,6 +45,16 @@ test('Verified source publishes once; generated commits and stale verification d
     assert.equal(git(['rev-parse', 'HEAD']), published);
     assert.match(publish(published), /No chart source changes/);
     assert.equal(git(['rev-parse', 'HEAD']), published);
+    const controlPlan = join(directory, 'control.json');
+    const controlPublish = () => execute(process.execPath, [resolve(root, 'scripts/publish.mjs'), verified, controlPlan, 'cody-control-plane'], local);
+    assert.match(controlPublish(), /Published chart 0.4.1/);
+    const controlIndex = readFileSync(join(local, 'index.yaml'), 'utf8');
+    assert.ok(controlIndex.includes('  cody-execution:'));
+    assert.ok(controlIndex.includes('  cody-control-plane:'));
+    assert.equal(nextVersion(controlIndex, '0.4.1', 'cody-control-plane'), '0.4.2');
+    assert.equal(nextVersion(controlIndex, '0.6.9'), '0.6.11');
+    assert.match(controlPublish(), /already published/);
+    assert.equal(JSON.parse(readFileSync(controlPlan, 'utf8')).archive, 'cody-control-plane-0.4.1.tgz');
     const archive = join(local, 'cody-execution-0.6.10.tgz');
     assert.equal(execute('helm', ['show', 'values', archive]), execute('helm', ['show', 'values', resolve(root, 'charts/cody-execution')]));
     writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');

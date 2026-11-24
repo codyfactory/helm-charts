@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-reconciler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-reconciler
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-reconciler
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      containers:
+        - name: reconciler
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/cody-control-plane]
+          args:
+            {{- if .Values.development }}
+            - --development
+            {{- end }}
+            - --role
+            - reconciler
+            - --recovery-input-retention
+            - {{ required "recoveryInputRetention is required" .Values.recoveryInputRetention | quote }}
+            - --recovery-batch-size
+            - {{ .Values.recoveryBatchSize | quote }}
+            - --recovery-interval
+            - {{ required "recoveryInterval is required" .Values.recoveryInterval | quote }}
+          env:
+            - name: CODY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseSecret is required" .Values.databaseSecret }}
+                  key: url

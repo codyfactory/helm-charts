@@ -1,0 +1,69 @@
+image: ghcr.io/codyfactory/cody-control-plane:0.7.5
+imagePullSecrets: []
+consoleEnabled: false
+executionReleasesConfigMap: ""
+trustedProxyCIDRs: ""
+clientIPHeader: ""
+appOrigin: "https://app.cody.so"
+apiOrigin: "https://api.cody.so"
+webUpstream: ""
+authBridgeSecret: ""
+databaseSecret: ""
+serverTLSSecret: ""
+inferenceSigningKeySecret:
+  name: ""
+  key: ""
+inferenceSigningKeyID: ""
+inferenceAudience: ""
+operatorTokenSecret: ""
+leaseTTL: 180s
+leaseRenewalInterval: 30s
+leaseSkew: 30s
+provisioningTimeout: 30m
+recoveryInputRetention: 24h
+recoveryBatchSize: 100
+recoveryInterval: 1m
+apiReplicas: 2
+connectors:
+  replicas: 2
+  reportQueueWorkers: 16
+slack:
+  enabled: false
+  appID: ""
+  clientID: ""
+  redirectURL: ""
+  secret: ""
+inference:
+  enabled: false
+  policySecret: ""
+  tlsSecret: ""
+
+github:
+  enabled: false
+  appID: ""
+  clientID: ""
+  redirectURL: ""
+  secret: ""
+  checkoutIssuerTokenSecret: ""
+  checkoutIssuerCASecret: ""
+
+development: false
+stripe:
+  secret: ""
+
+# Hosted prereleases are separate from loopback-only development transport.
+releaseChannel: prod
+
+migrations:
+  enabled: true
+  databaseSecret: ""
+  activeDeadlineSeconds: 300
+  backoffLimit: 2
+  labels: {}
+  annotations: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 2Gi

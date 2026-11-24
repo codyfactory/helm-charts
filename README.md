@@ -527,3 +527,30 @@ See [hosted operations](https://github.com/codyfactory/cody/blob/main/deploy/fly
 for one-time dev/prod setup. Customers still upgrade explicitly and retain their
 private values, Secrets and PVCs; image aliases or chart publication do not update
 an existing installation.
+
+## Control plane
+
+`charts/cody-control-plane` packages the API, gateway and reconciler, with optional
+connectors and inference. It is published to the same public Helm repository as
+`cody-execution`, with an independent chart version. Container image access is a
+separate prerequisite; a public chart does not make private images public.
+
+Supply existing runtime database, migration database, operator token and TLS
+Secrets plus the execution release catalog ConfigMap; see
+`examples/control-plane-values.yaml`. The migration Secret has a `url` key and
+must connect directly to PostgreSQL, using a DDL role distinct from the runtime
+role. Secrets must exist before installing the chart.
+
+The migration Job runs as a `pre-install,pre-upgrade` hook using the same image as
+all serving components. Helm waits for success before updating workloads. The
+previous Job is deleted before the next hook, so image changes never patch an
+immutable pod template. Successful Jobs are deleted; failed Jobs remain for
+inspection until the next attempt. Set the Helm timeout above the migration
+active deadline. Migrations must be repeatable and compatible with the old
+workloads, which continue serving during an upgrade. Helm rollback does not undo
+schema changes. `migrations.enabled=false` is only for installations with separate
+schema orchestration; it is not the default.
+
+The publication workflow packages verified source only, preserves old archives
+and index entries, and keeps execution-plane publication notifications separate
+from control-plane chart publication.

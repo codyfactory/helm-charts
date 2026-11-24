@@ -1,0 +1,6 @@
+databaseSecret: fixture-runtime-db
+serverTLSSecret: fixture-tls
+operatorTokenSecret: fixture-operator
+executionReleasesConfigMap: fixture-releases
+migrations:
+  databaseSecret: fixture-migration-db

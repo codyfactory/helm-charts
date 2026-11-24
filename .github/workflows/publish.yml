@@ -51,3 +51,7 @@ jobs:
           name: component-publication
           overwrite: true
           path: artifacts/publication.json
+      - name: Publish verified control-plane chart
+        env:
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/publish.mjs "$VERIFIED_SHA" artifacts/control-plane-publication.json cody-control-plane
