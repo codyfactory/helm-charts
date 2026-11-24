@@ -51,8 +51,9 @@ export function publish(verified, chart = 'cody-execution') {
     console.log('Newer chart source is awaiting its own verification');
     return;
   }
+  const chartPaths = [`charts/${chart}`, 'scripts', 'mise.toml', '.github'];
   const published = git(['log', '-1', '--format=%H', 'origin/main', '--', `${chart}-*.tgz`]);
-  if (published && !git(['diff', '--name-only', published, verified, '--', ...sourcePaths])) {
+  if (published && !git(['diff', '--name-only', published, verified, '--', ...chartPaths])) {
     console.log('No chart source changes');
     return;
   }

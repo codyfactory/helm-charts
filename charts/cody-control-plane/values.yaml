@@ -51,7 +51,6 @@ development: false
 stripe:
   secret: ""
 
-# Hosted prereleases are separate from loopback-only development transport.
 releaseChannel: prod
 
 migrations:

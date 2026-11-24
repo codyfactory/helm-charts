@@ -57,11 +57,17 @@ test('Verified source publishes once; generated commits and stale verification d
     assert.equal(JSON.parse(readFileSync(controlPlan, 'utf8')).archive, 'cody-control-plane-0.4.1.tgz');
     const archive = join(local, 'cody-execution-0.6.10.tgz');
     assert.equal(execute('helm', ['show', 'values', archive]), execute('helm', ['show', 'values', resolve(root, 'charts/cody-execution')]));
+    writeFileSync(join(local, 'charts/cody-control-plane/values.yaml'), readFileSync(join(local, 'charts/cody-control-plane/values.yaml'), 'utf8') + '\n');
+    git(['add', '.']); git(['commit', '-qm', 'Control only']); git(['push', 'origin', 'HEAD:main']);
+    const controlOnly = git(['rev-parse', 'HEAD']);
+    assert.match(publish(controlOnly), /No chart source changes/);
+    assert.match(execute(process.execPath, [resolve(root, 'scripts/publish.mjs'), controlOnly, controlPlan, 'cody-control-plane'], local), /Published chart 0.4.2/);
     writeFileSync(join(local, 'charts/cody-execution/values.yaml'), readFileSync(join(local, 'charts/cody-execution/values.yaml'), 'utf8') + '\n');
     git(['add', '.']); git(['commit', '-qm', 'Source change before documentation']);
     writeFileSync(join(local, 'README.md'), 'Documentation-only tip of a multi-commit push');
     git(['add', '.']); git(['commit', '-qm', 'Documentation']); git(['push', 'origin', 'HEAD:main']);
     assert.match(publish(git(['rev-parse', 'HEAD'])), /Published chart 0.6.11/);
+    assert.match(execute(process.execPath, [resolve(root, 'scripts/publish.mjs'), git(['rev-parse', 'HEAD']), controlPlan, 'cody-control-plane'], local), /No chart source changes/);
     const indexBeforeRepair=readFileSync(join(local,'index.yaml'));
     const archiveBeforeRepair=readFileSync(archive);
     const plan=join(directory,'repair.json');
